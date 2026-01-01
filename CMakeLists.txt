@@ -39,7 +39,12 @@ include(minnmea.cmake)
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(ADCS_board ADCS_board.c)
+add_executable(ADCS_board 
+    src/main.c
+    src/GPS.cpp
+    src/bmp280.c
+
+)
 
 pico_set_program_name(ADCS_board "ADCS_board")
 pico_set_program_version(ADCS_board "0.1")
