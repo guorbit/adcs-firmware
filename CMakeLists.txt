@@ -33,6 +33,10 @@ project(ADCS_board C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# Add GPS module - PUT IT HERE (after pico_sdk_init)
+set(MINNMEA_PATH "${CMAKE_CURRENT_LIST_DIR}/lib/minmea_full")
+include(minnmea.cmake)
+
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(ADCS_board ADCS_board.c)
@@ -55,7 +59,8 @@ target_include_directories(ADCS_board PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(ADCS_board 
-        hardware_i2c
+        minnmea
+	hardware_i2c
         pico_i2c_slave
         )
 

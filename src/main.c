@@ -4,7 +4,8 @@
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
 #include "adcs_defines.h"
-
+#include "GPS.h"
+#include "hardware/uart.h"
 // Based on Raspberry Pi Pico SDK BMP280 example
 // Copyright (c) 2021 Raspberry Pi (Trading) Ltd.
 // SPDX-License-Identifier: BSD-3-Clause
@@ -86,3 +87,17 @@ int main() {
     }
 #endif
 }
+
+
+
+//GPS Stuffs for when tidier
+
+//In setup:
+GPS::getInstance()->setUp(uart0, 0, 1, 9600);
+
+// In loop:
+printf("%s,%.5f,%.5f,%.1f\n",
+    GPS::getInstance()->getTime(),
+    GPS::getInstance()->getLat(),
+    GPS::getInstance()->getLon(),
+    GPS::getInstance()->getHeight());
