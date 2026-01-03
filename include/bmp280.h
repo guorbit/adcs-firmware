@@ -1,4 +1,7 @@
- // device has default bus address of 0x76
+#ifndef BMP280_H
+#define BMP280_H
+
+// device has default bus address of 0x76
 #define BMP280_ADDR _u(0x76)
 
 // hardware registers
@@ -42,3 +45,5 @@
 
 // number of calibration registers to be read
 #define BMP280_NUM_CALIB_PARAMS 24
+
+#endif

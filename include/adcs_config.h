@@ -1,5 +1,5 @@
-#ifndef BOARD_CONFIG_H
-#define BOARD_CONFIG_H
+#ifndef ADCS_CONFIG_H
+#define ADCS_CONFIG_H
 
 #include "hardware/i2c.h"
 
