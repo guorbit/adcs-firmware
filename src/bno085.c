@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
 #include "adcs_config.h"
-#include <string.h>
 #include "pico/binary_info.h"
 
 ///// sh2 hal
 static int sh2chal_open(sh2_Hal_t *self) {
     // Serial.println("I2C HAL open");
-
 
     uint8_t softreset_pkt[] = {
     0x05,  // length LSB
@@ -34,8 +34,8 @@ static int sh2chal_open(sh2_Hal_t *self) {
     return 0;
 }
 
-static void sh2_hal_close(void) {
-    // if empty why here...
+static void sh2_hal_close(sh2_Hal_t *self) {
+    // so sh2 doesn't complain
 }
 
 static int sh2_hal_write(const uint8_t *buf, unsigned len){
@@ -99,23 +99,6 @@ static int sh2_hal_read(uint8_t *pBuffer, unsigned len, uint32_t *timestamp_us) 
     return packet_size;
 }
 
-static int sh2_hal_delay_us(uint32_t us) {
-    sleep_us(us);
-    return 0;
-}
-
-
-///// bno085 hal
-static void bno085_hal_reset(void) {
-    // if you have a reset GPIO, do the same sequence, otherwise leave empty
-    // or just power-cycle externally.
-}
-
-static void bno085_hal_delay_ms(uint32_t ms) {
-    sleep_ms(ms);
-}
- // optional, so i wont after i read it
-
 ///// sh2 callbacks
 static void sh2_async_event_handler(void *cookie, sh2_AsyncEvent_t *event) {
     if (event->eventId == SH2_RESET) {
@@ -148,8 +131,6 @@ bool bno085_init(i2c_inst_t *i2c, uint8_t addr) {
     _HAL.read      = sh2_hal_read;
     _HAL.write     = sh2_hal_write;
     _HAL.getTimeUs = hal_getTimeUs;      // from section 2.5
-
-    bno085_hal_reset();                  // hardware reset if you have it
 
     // Open SH2
     int status = sh2_open(&_HAL, sh2_async_event_handler, NULL);
@@ -209,13 +190,6 @@ bool bno085_get_quaternion(float *qw, float *qx, float *qy, float *qz) {
 
     bno085_has_new = false;   // consume the sample
     return true;
-}
-
-
-static bool bno085_has_new = false;
-
-bool bno085_data_ready(void) {
-    return bno085_has_new;
 }
 
 void bno085_poll(void) {

@@ -1,6 +1,8 @@
 #ifndef BMP280_H
 #define BMP280_H
 
+#include <stdint.h>
+
 // device has default bus address of 0x76
 #define BMP280_ADDR _u(0x76)
 

@@ -13,6 +13,8 @@
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
+#include <stdint.h>
+
 
 
 #define GPS_BUF_LEN 1024

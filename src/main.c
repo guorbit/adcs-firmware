@@ -3,45 +3,13 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
-#include "adcs_defines.h"
+#include "adcs_config.h"
 #include "GPS.h"
 #include "hardware/uart.h"
 // Based on Raspberry Pi Pico SDK BMP280 example
 // Copyright (c) 2021 Raspberry Pi (Trading) Ltd.
 // SPDX-License-Identifier: BSD-3-Clause
 
-
-int main()
-{
-    stdio_init_all();
-
-    // I2C Initialisation. Using it at 400Khz.
-    i2c_init(I2C_PORT_0, 400*1000);
-    i2c_init(I2C_PORT_1, 400*1000);
-    // set pico as slave on i2c1 bus, 0x08 is an arbitrary address
-    i2c_set_slave_mode(I2C_PORT_1, true, 0x08);
-
-    // defines the pins i chose earlier as i2c pins
-    gpio_set_function(I2C_SDA_0, GPIO_FUNC_I2C);
-    gpio_set_function(I2C_SCL_0, GPIO_FUNC_I2C);
-    gpio_pull_up(I2C_SDA_0);
-    gpio_pull_up(I2C_SCL_0);
-    // For more examples of I2C use see https://github.com/raspberrypi/pico-examples/tree/master/i2c
-
-    i2c_slave_init(i2c1, ADCS_ADDR, &i2c_slave_handler);
-    bmp280_init_sensor();
-
-    while (true) {
-        uint8_t data[6];
-        bmp280_read_reg(0xF7, data, 6);
-
-        int32_t adc_p = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4);
-        int32_t adc_t = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4);
-
-        tight_loop_contents();
-
-    }
-}
 
 // main from bmp280 code,, :'D
 int main() {

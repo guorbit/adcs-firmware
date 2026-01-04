@@ -4,7 +4,7 @@
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
 #include "bmp280.h"
-#include "adcs_defines.h"
+#include "adcs_config.h"
 #include "pico/binary_info.h"
 
 // GPIO PICO_DEFAULT_I2C_SDA_PIN (on Pico this is GP4 (pin 6)) -> SDA on BMP280
@@ -129,7 +129,7 @@ void bmp280_get_calib_params(struct bmp280_calib_param* params) {
     // and MSB register, so we read from 24 registers
 
     uint8_t buf[BMP280_NUM_CALIB_PARAMS] = { 0 };
-    uint8_t reg = REG_DIG_T1_LSB;
+    uint8_t reg = BMP280_REG_DIG_T1_LSB;
     i2c_write_blocking(i2c_default, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
     // read in one go as register addresses auto-increment
     i2c_read_blocking(i2c_default, BMP280_ADDR, buf, BMP280_NUM_CALIB_PARAMS, false);  // false, we're done reading
