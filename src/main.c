@@ -60,10 +60,17 @@ int main() {
 
 //GPS Stuffs for when tidier
 
-//In setup:
+//put this in setup/nitialization
+
+// uart0: UART peripheral used
+// GPIO 0: uart TX
+// GPIO 1: uart RX
+//9600: baud rate
 GPS::getInstance()->setUp(uart0, 0, 1, 9600);
 
-// In loop:
+// put this in main loop:
+
+//prints GPS data as CSV: time, lat, lon, height
 printf("%s,%.5f,%.5f,%.1f\n",
     GPS::getInstance()->getTime(),
     GPS::getInstance()->getLat(),
