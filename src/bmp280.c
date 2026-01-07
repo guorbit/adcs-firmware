@@ -4,7 +4,6 @@
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
 #include "bmp280.h"
-#include "adcs_config.h"
 #include "pico/binary_info.h"
 
 // GPIO PICO_DEFAULT_I2C_SDA_PIN (on Pico this is GP4 (pin 6)) -> SDA on BMP280

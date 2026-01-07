@@ -12,7 +12,7 @@
 
 static bool reset_occured = false;
 static sh2_SensorValue_t sensorValue;
-static sh2_SensorValue_t * sensor_value = &sensorValue // pointer to the struct provided by the sh2 driver
+static sh2_SensorValue_t * sensor_value = &sensorValue; // pointer to the struct provided by the sh2 driver
 
 ///// sh2 hal, this is the protocol running on the bno085
 static int sh2chal_open(sh2_Hal_t *self) {
