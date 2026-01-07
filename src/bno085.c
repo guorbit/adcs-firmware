@@ -5,10 +5,16 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
-#include "adcs_config.h"
 #include "pico/binary_info.h"
+#include "bno085.h"
 
-///// sh2 hal
+// to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
+
+static bool reset_occured = false;
+static sh2_SensorValue_t sensorValue;
+static sh2_SensorValue_t * sensor_value = &sensorValue // pointer to the struct provided by the sh2 driver
+
+///// sh2 hal, this is the protocol running on the bno085
 static int sh2chal_open(sh2_Hal_t *self) {
     // Serial.println("I2C HAL open");
 
@@ -39,61 +45,55 @@ static void sh2_hal_close(sh2_Hal_t *self) {
 }
 
 static int sh2_hal_write(const uint8_t *buf, unsigned len){
-    size_t i2c_buffer_max = maxBufferSize();
-    uint16_t write_size = (len > i2c_buffer_max) ? i2c_buffer_max : len;
+    int write;
 
-    if (!i2c_write(buf, write_size, true, NULL, 0)) {
+    write = i2c_write_timeout_us(
+        BNO085_I2C, BNO085_ADDR,
+        buf, len, false,
+        I2C_TIMEOUT_US
+    );
+    
+    if (write != (int)len) {
         return 0;
     }
-    return write_size;
+    return write;
 }
 
-static int sh2_hal_read(uint8_t *pBuffer, unsigned len, uint32_t *timestamp_us) {
-    uint8_t header[4];
-    if (!i2c_read(header, 4, true)) {
-        return 0;
+static int sh2_hal_read(uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_us) {
+    uint8_t header[4]; // buffer for header
+    int return_value;
+    uint16_t packet_size;
+    uint16_t data_size;
+
+    return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, header, 4, false, I2C_TIMEOUT_US);
+
+    if (return_value != 4) {
+        return 0; // read failed, it should be a 4 byte header
     }
 
-    uint16_t packet_size = (uint16_t)header[0] | ((uint16_t)header[1] << 8);
+    // getting the packet size
+    packet_size = (uint16_t)header[0] | ((uint16_t)header[1] << 8);
     packet_size &= ~0x8000;  // clear continue bit
 
     if (packet_size > len) {
         return 0;            // caller buffer too small
     }
 
-    size_t i2c_buffer_max = maxBufferSize();
-    uint16_t cargo_remaining = packet_size;
-    uint8_t i2c_buffer[i2c_buffer_max];
-    uint16_t read_size;
-    uint16_t cargo_read_amount = 0;
-    bool first_read = true;
+    // add header into the buffer
+    memcpy(i2c_buffer, header, 4);
 
-    while (cargo_remaining > 0) {
-        if (first_read) {
-            read_size = (cargo_remaining > i2c_buffer_max) ? i2c_buffer_max : cargo_remaining;
-        } else {
-            read_size = (cargo_remaining + 4 > i2c_buffer_max) ? i2c_buffer_max : (cargo_remaining + 4);
-        }
+    data_size = packet_size - 4; // everything but the 4 byte header
 
-        if (!i2c_read(i2c_buffer, read_size, true)) {
+    if (data_size > 0) {
+        return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, i2c_buffer + 4, data_size, false, I2C_TIMEOUT_US);
+
+        if (return_value != data_size) {
             return 0;
         }
-
-        if (first_read) {
-            cargo_read_amount = read_size;
-            memcpy(pBuffer, i2c_buffer, cargo_read_amount);
-            first_read = false;
-        } else {
-            cargo_read_amount = read_size - 4;
-            memcpy(pBuffer, i2c_buffer + 4, cargo_read_amount);
-        }
-
-        pBuffer += cargo_read_amount;
-        cargo_remaining -= cargo_read_amount;
     }
 
     if (timestamp_us) {
-        *timestamp_us = to_us_since_boot(get_absolute_time());
+        *timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
     }
 
     return packet_size;
@@ -102,13 +102,13 @@ static int sh2_hal_read(uint8_t *pBuffer, unsigned len, uint32_t *timestamp_us) 
 ///// sh2 callbacks
 static void sh2_async_event_handler(void *cookie, sh2_AsyncEvent_t *event) {
     if (event->eventId == SH2_RESET) {
-        _reset_occurred = true;
+        reset_occurred = true;
     }
 }
 
 static void sh2_sensor_event_handler(void *cookie, sh2_SensorEvent_t *event) {
-    if (sh2_decodeSensorEvent(_sensor_value, event) != SH2_OK) {
-        _sensor_value->timestamp = 0;
+    if (sh2_decodeSensorEvent(sensor_value, event) != SH2_OK) {
+        sensor_value->timestamp = 0;
     }
 }
 
