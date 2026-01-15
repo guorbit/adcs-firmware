@@ -76,3 +76,85 @@ printf("%s,%.5f,%.5f,%.1f\n",
     GPS::getInstance()->getLat(),
     GPS::getInstance()->getLon(),
     GPS::getInstance()->getHeight());
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//BMP preasure for when tidier
+
+#include <stdio.h>
+#include <stdint.h>
+#include "pico/stdlib.h"
+#include "hardware/i2c.h"
+#include "bmp280.h"
+
+int main() {
+    // Initialize UART for debugging output
+    stdio_init_all();
+    
+    // Wait a moment for USB to initialize
+    sleep_ms(1000);
+    
+    // Initialize I2C port (using default pins)
+    i2c_init(i2c_default, 400 * 1000);  // 400 kHz
+    gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
+    gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+    
+    printf("I2C initialized on pins SDA=%d, SCL=%d\n", PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN);
+    
+    // Test I2C communication - try to read from BMP280
+    uint8_t test_buf[1];
+    int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
+    printf("I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    
+    if (ret < 0) {
+        printf("Trying alternate address 0x77...\n");
+        ret = i2c_read_blocking(i2c_default, 0x77, test_buf, 1, false);
+        printf("I2C read test (addr 0x77): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    }
+    
+    // Reset the BMP280
+    bmp280_reset();
+    sleep_ms(100);  //wait after reset
+    
+    // Initialize the BMP280
+    bmp280_init();
+    sleep_ms(100);  //wait after init
+    
+    // Read calibration parameters
+    struct bmp280_calib_param calib_params;
+    bmp280_get_calib_params(&calib_params);
+    printf("Calibration parameters loaded\n");
+    printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
+    printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
+    
+    while (1) {
+        int32_t raw_temp, raw_pressure;
+        bmp280_read_raw(&raw_temp, &raw_pressure);
+        
+        int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
+        uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
+        
+        float temperature = temp_c / 100.0f;
+        
+        printf("%.2f\t\t%lu\n", temperature, pressure_pa);
+        
+        sleep_ms(1000);
+    }
+    
+    return 0;
+}
