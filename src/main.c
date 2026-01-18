@@ -3,7 +3,6 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
-#include "adcs_config.h"
 #include "GPS.h"
 #include "hardware/uart.h"
 // Based on Raspberry Pi Pico SDK BMP280 example
@@ -60,17 +59,10 @@ int main() {
 
 //GPS Stuffs for when tidier
 
-//put this in setup/nitialization
-
-// uart0: UART peripheral used
-// GPIO 0: uart TX
-// GPIO 1: uart RX
-//9600: baud rate
+//In setup:
 GPS::getInstance()->setUp(uart0, 0, 1, 9600);
 
-// put this in main loop:
-
-//prints GPS data as CSV: time, lat, lon, height
+// In loop:
 printf("%s,%.5f,%.5f,%.1f\n",
     GPS::getInstance()->getTime(),
     GPS::getInstance()->getLat(),

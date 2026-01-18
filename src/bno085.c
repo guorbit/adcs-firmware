@@ -112,13 +112,18 @@ static void sh2_sensor_event_handler(void *cookie, sh2_SensorEvent_t *event) {
     }
 }
 
+static uint32_t hal_getTimeUs(sh2_Hal_t *self)
+{
+    return (uint32_t)to_us_since_boot(get_absolute_time());
+}
+
 
 ///// bno085 driver
-bool bno085_init(i2c_inst_t *i2c, uint8_t addr) {
-    _i2cPort = i2c;
-    _deviceAddress = addr;
+bool bno085_init(void) {
+    _i2cPort = BNO085_I2C;
+    _deviceAddress = BNO085_ADDR;
 
-    // Optional: check device present
+    // check device present, does bno ack ?
     uint8_t dummy;
     int res = i2c_read_timeout_us(_i2cPort, _deviceAddress, &dummy, 1, false, CONFIG::I2C_TIMEOUT_US);
     if (res <= 0) {
@@ -127,51 +132,43 @@ bool bno085_init(i2c_inst_t *i2c, uint8_t addr) {
 
     // Fill HAL struct (names must match your sh2.h)
     _HAL.open      = sh2chal_open;
-    _HAL.close     = sh2_hal_close;      // or &sh2_hal_close if signature matches
+    _HAL.close     = sh2_hal_close;
     _HAL.read      = sh2_hal_read;
     _HAL.write     = sh2_hal_write;
-    _HAL.getTimeUs = hal_getTimeUs;      // from section 2.5
+    _HAL.getTimeUs = hal_getTimeUs;
 
-    // Open SH2
+    // open sh2, sh2_open is from the ceva sh2 api (sh2.c)
     int status = sh2_open(&_HAL, sh2_async_event_handler, NULL);
     if (status != SH2_OK) {
         return false;
     }
 
-    // Probe product IDs (sanity check)
-    sh2_ProductIds_t prodIds;
-    memset(&prodIds, 0, sizeof(prodIds));
-    status = sh2_getProdIds(&prodIds);
-    if (status != SH2_OK) {
-        return false;
-    }
-
-    // Register sensor callback
+    // register sensor callback, also from the ceva api
     sh2_setSensorCallback(sh2_sensor_event_handler, NULL);
 
-    _sensor_value = &sensorValue;
+    _sensor_value = &sensorValue; // de-ref pointer
     _reset_occurred = false;
 
     return true;
 }
 
+// which report to enable e.g. SH2_ACCELEROMETER, SH2_ROTATION_VECTOR and report interval
 static bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
-    sh2_SensorConfig_t cfg;
+    sh2_SensorConfig_t cfg; // create struct called cfg
     memset(&cfg, 0, sizeof(cfg));
 
     cfg.reportInterval_us = interval_us;
+    // disabled
     cfg.changeSensitivityEnabled = false;
     cfg.wakeupEnabled = false;
     cfg.alwaysOnEnabled = false;
     cfg.batchInterval_us = 0;
     cfg.sensorSpecific = 0;
 
+    // ceva sh2 api, send cfg from pico to bno085
     int status = sh2_setSensorConfig(sensorId, &cfg);
+    // 1 = true, 0 = false
     return (status == SH2_OK);
-}
-
-bool bno085_enable_rotation_vector(uint32_t interval_us) {
-    return enable_report(SH2_ROTATION_VECTOR, interval_us);
 }
 
 bool bno085_get_quaternion(float *qw, float *qx, float *qy, float *qz) {
