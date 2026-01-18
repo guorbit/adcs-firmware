@@ -99,7 +99,7 @@ int32_t bmp280_convert_pressure(int32_t pressure, int32_t temp, struct bmp280_ca
     int32_t t_fine = bmp280_convert(temp, params);
 
     int32_t var1, var2;
-    uint32_t converted = 0.0;
+    uint32_t converted = 0;
     var1 = (((int32_t)t_fine) >> 1) - (int32_t)64000;
     var2 = (((var1 >> 2) * (var1 >> 2)) >> 11) * ((int32_t)params->dig_p6);
     var2 += ((var1 * ((int32_t)params->dig_p5)) << 1);
