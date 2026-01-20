@@ -43,7 +43,7 @@ add_executable(ADCS_git
     src/main.c
     src/GPS.cpp
     src/bmp280.c
-
+    src/bno085.c
 )
 
 pico_set_program_name(ADCS_git "ADCS_git")

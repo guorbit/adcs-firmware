@@ -1,18 +1,27 @@
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/i2c_slave.h"
 #include "pico/binary_info.h"
 #include "bno085.h"
 
+// sh2 libraries https://github.com/ceva-dsp/sh2
+#include "sh2.h"
+#include "sh2_SensorValue.h"
+#include "sh2_err.h"
+#include "sh2_hal.h"
+
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
-static bool reset_occured = false;
-static sh2_SensorValue_t sensorValue;
-static sh2_SensorValue_t * sensor_value = &sensorValue; // pointer to the struct provided by the sh2 driver
+static sh2_Hal_t HAL;
+static bool reset_occurred = false;
+static bool bno085_has_new = false;
+static sh2_SensorValue_t sensorValue; // initialise struct of type sh2_SensorValue_t
+static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is pointer to the struct provided by the sh2 driver
+// probably need to provide a definition for the sensor_value struct, for now look at the sh2.h file
+
+
 
 ///// sh2 hal, this is the protocol running on the bno085
 static int sh2chal_open(sh2_Hal_t *self) {
@@ -25,13 +34,14 @@ static int sh2chal_open(sh2_Hal_t *self) {
     0x00,  // sequence
     0x01   // reset command
     };
+
     // initialise bool as false
     bool success = false;
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
-        if (i2c_write(softreset_pkt, 5)) {
+        if (i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US)) {
             success = true;
             break;
-        }
+            }
         sleep_ms(30);
     }
     if (!success) // <- if success = false
@@ -44,7 +54,7 @@ static void sh2_hal_close(sh2_Hal_t *self) {
     // so sh2 doesn't complain
 }
 
-static int sh2_hal_write(const uint8_t *buf, unsigned len){
+static int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     int write;
 
     write = i2c_write_timeout_us(
@@ -59,7 +69,7 @@ static int sh2_hal_write(const uint8_t *buf, unsigned len){
     return write;
 }
 
-static int sh2_hal_read(uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_us) {
+static int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_us) {
     uint8_t header[4]; // buffer for header
     int return_value;
     uint16_t packet_size;
@@ -84,11 +94,15 @@ static int sh2_hal_read(uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_u
 
     data_size = packet_size - 4; // everything but the 4 byte header
 
+    // packet_size checks
     if (data_size > 0) {
         return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, i2c_buffer + 4, data_size, false, I2C_TIMEOUT_US);
 
         if (return_value != data_size) {
+            
+            if (packet_size < 4) {
             return 0;
+            }
         }
     }
 
@@ -107,8 +121,8 @@ static void sh2_async_event_handler(void *cookie, sh2_AsyncEvent_t *event) {
 }
 
 static void sh2_sensor_event_handler(void *cookie, sh2_SensorEvent_t *event) {
-    if (sh2_decodeSensorEvent(sensor_value, event) != SH2_OK) {
-        sensor_value->timestamp = 0;
+    if (sh2_decodeSensorEvent(sensor_value, event) == SH2_OK) {
+        bno085_has_new = true;
     }
 }
 
@@ -120,25 +134,22 @@ static uint32_t hal_getTimeUs(sh2_Hal_t *self)
 
 ///// bno085 driver
 bool bno085_init(void) {
-    _i2cPort = BNO085_I2C;
-    _deviceAddress = BNO085_ADDR;
-
     // check device present, does bno ack ?
     uint8_t dummy;
-    int res = i2c_read_timeout_us(_i2cPort, _deviceAddress, &dummy, 1, false, CONFIG::I2C_TIMEOUT_US);
+    int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
         return false;
     }
 
-    // Fill HAL struct (names must match your sh2.h)
-    _HAL.open      = sh2chal_open;
-    _HAL.close     = sh2_hal_close;
-    _HAL.read      = sh2_hal_read;
-    _HAL.write     = sh2_hal_write;
-    _HAL.getTimeUs = hal_getTimeUs;
+    // fill HAL struct
+    HAL.open      = sh2chal_open;
+    HAL.close     = sh2_hal_close;
+    HAL.read      = sh2_hal_read;
+    HAL.write     = sh2_hal_write;
+    HAL.getTimeUs = hal_getTimeUs;
 
     // open sh2, sh2_open is from the ceva sh2 api (sh2.c)
-    int status = sh2_open(&_HAL, sh2_async_event_handler, NULL);
+    int status = sh2_open(&HAL, sh2_async_event_handler, NULL);
     if (status != SH2_OK) {
         return false;
     }
@@ -146,8 +157,7 @@ bool bno085_init(void) {
     // register sensor callback, also from the ceva api
     sh2_setSensorCallback(sh2_sensor_event_handler, NULL);
 
-    _sensor_value = &sensorValue; // de-ref pointer
-    _reset_occurred = false;
+    reset_occurred = false;
 
     return true;
 }
@@ -172,29 +182,27 @@ static bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
 }
 
 bool bno085_get_quaternion(float *qw, float *qx, float *qy, float *qz) {
-    if (!_sensor_value || _sensor_value->sensorId != SH2_ROTATION_VECTOR) {
+    // checks 1st, will exit the function if something goes wrong
+    // if sensor_value is invalid or sensorId != rotation vector (go to struct sensor_value points to, access sensorId, check that it equals the thing)
+    if (!sensor_value || sensor_value->sensorId != SH2_ROTATION_VECTOR) {
         return false;
     }
-
+    // if false then exit, cuz no new quaternion
     if (!bno085_has_new) {
         return false;
     }
 
-    *qw = _sensor_value->un.rotationVector.real;
-    *qx = _sensor_value->un.rotationVector.i;
-    *qy = _sensor_value->un.rotationVector.j;
-    *qz = _sensor_value->un.rotationVector.k;
+    // set de-refed pointer to the value u get when accessing struct sensor_value points to, access relevant stuff
+    *qw = sensor_value->un.rotationVector.real;
+    *qx = sensor_value->un.rotationVector.i;
+    *qy = sensor_value->un.rotationVector.j;
+    *qz = sensor_value->un.rotationVector.k;
 
-    bno085_has_new = false;   // consume the sample
+    bno085_has_new = false;   // mark sample as consumed
     return true;
 }
 
 void bno085_poll(void) {
-    // Ask sh2 to process any pending transfers
+    // ask sh2 to process any pending transfers
     sh2_service();
-
-    // If sensorHandler ran and decoded something, _sensor_value->timestamp != 0
-    if (_sensor_value && _sensor_value->timestamp != 0) {
-        bno085_has_new = true;
-    }
 }
