@@ -7,6 +7,7 @@
 #include "bno085.h"
 
 // sh2 libraries https://github.com/ceva-dsp/sh2
+// based on this library https://github.com/robotcopper/BNO08x_Pico_Library, i took out a lot of stuff though
 #include "sh2.h"
 #include "sh2_SensorValue.h"
 #include "sh2_err.h"
@@ -24,7 +25,7 @@ static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is point
 
 
 ///// sh2 hal, this is the protocol running on the bno085
-static int sh2chal_open(sh2_Hal_t *self) {
+int sh2chal_open(sh2_Hal_t *self) {
     // Serial.println("I2C HAL open");
 
     uint8_t softreset_pkt[] = {
@@ -50,11 +51,11 @@ static int sh2chal_open(sh2_Hal_t *self) {
     return 0;
 }
 
-static void sh2_hal_close(sh2_Hal_t *self) {
+void sh2_hal_close(sh2_Hal_t *self) {
     // so sh2 doesn't complain
 }
 
-static int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
+int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     int write;
 
     write = i2c_write_timeout_us(
@@ -69,7 +70,7 @@ static int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     return write;
 }
 
-static int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_us) {
+int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_us) {
     uint8_t header[4]; // buffer for header
     int return_value;
     uint16_t packet_size;
@@ -85,8 +86,8 @@ static int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint
     packet_size = (uint16_t)header[0] | ((uint16_t)header[1] << 8);
     packet_size &= ~0x8000;  // clear continue bit
 
-    if (packet_size > len) {
-        return 0;            // caller buffer too small
+    if (packet_size > len || packet_size < 4) {
+        return 0;            // caller buffer too small or to prevent underflow
     }
 
     // add header into the buffer
@@ -97,12 +98,8 @@ static int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint
     // packet_size checks
     if (data_size > 0) {
         return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, i2c_buffer + 4, data_size, false, I2C_TIMEOUT_US);
-
         if (return_value != data_size) {
-            
-            if (packet_size < 4) {
-            return 0;
-            }
+        return 0;
         }
     }
 
@@ -126,7 +123,7 @@ static void sh2_sensor_event_handler(void *cookie, sh2_SensorEvent_t *event) {
     }
 }
 
-static uint32_t hal_getTimeUs(sh2_Hal_t *self)
+uint32_t hal_getTimeUs(sh2_Hal_t *self)
 {
     return (uint32_t)to_us_since_boot(get_absolute_time());
 }
@@ -163,7 +160,7 @@ bool bno085_init(void) {
 }
 
 // which report to enable e.g. SH2_ACCELEROMETER, SH2_ROTATION_VECTOR and report interval
-static bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
+bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
     sh2_SensorConfig_t cfg; // create struct called cfg
     memset(&cfg, 0, sizeof(cfg));
 
