@@ -67,6 +67,8 @@ target_link_libraries(ADCS_git
         minnmea
         hardware_i2c
         pico_i2c_slave
+        hardware_uart
+        hardware_irq
         )
 
 pico_add_extra_outputs(ADCS_git)

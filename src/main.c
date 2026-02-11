@@ -54,62 +54,115 @@ int main() {
 
     // initialize BNO085
     if (!bno085_init()) {
+        while(1) {
         printf("BNO085 Init Failed!\n");
-    } else {
-        sh2_devReset();
-        sleep_ms(200);
-        // Enable Reports
-        enable_report(SH2_ROTATION_VECTOR, 10000);
-        enable_report(SH2_ACCELEROMETER, 10000);
-        enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 10000);
-        printf("BNO085 Initialized.\n");
+        }
     }
+
+    sh2_devReset();
+    sleep_ms(200);
+    
+    for (int i = 0; i < 200; i++) {
+        bno085_poll();  // poll sensor for advert packet
+        sleep_ms(100);
+    }
+
+    // enable Reports
+    enable_report(SH2_ROTATION_VECTOR, 10000);
+    enable_report(SH2_ACCELEROMETER, 10000);
+    enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 10000);
+    sleep_ms(100);
+    
 
     uint32_t last_print = 0;
     bno085_state_t bno_state;
 
     while (1) {
-        // Poll Sensors
+        // poll sensor
         bno085_poll();
         
         uint32_t now = to_ms_since_boot(get_absolute_time());
 
-        // Process and Print Data every 1 second
+        // print data every 1 second
         if (now - last_print > 1000) {
-            // Read BMP280
+            // read BMP280
             int32_t raw_temp, raw_press;
             bmp280_read_raw(&raw_temp, &raw_press);
             float temp = bmp280_convert_temp(raw_temp, &bmp_params) / 100.f;
             uint32_t press = bmp280_convert_pressure(raw_press, raw_temp, &bmp_params);
 
-            // Print GPS
+            // print GPS
             printf("GPS: %s,%.5f,%.5f,%.1f\n",
                    GPS_GetTime(),
                    GPS_GetLat(),
                    GPS_GetLon(),
                    GPS_GetHeight());
 
-            // Print BMP
+            // print BMP
             printf("BMP: Temp: %.2f C | Pres: %u Pa\n", temp, press);
 
-            // Print BNO085
+            // print BNO085
             if (bno085_get_report(&bno_state)) {
-                printf("IMU: Acc:%.2f %.2f %.2f | Quat:%.2f %.2f %.2f %.2f\n",
-                       bno_state.accel[0], bno_state.accel[1], bno_state.accel[2],
-                       bno_state.quat[0], bno_state.quat[1], bno_state.quat[2], bno_state.quat[3]);
+                printf("acc: %.2f %.2f %.2f | quat: %.2f %.2f %.2f %.2f | mag: %.1f %.1f %.1f\n",
+                bno_state.accel[0], bno_state.accel[1], bno_state.accel[2],
+                bno_state.quat[0],  bno_state.quat[1],  bno_state.quat[2], bno_state.quat[3],
+                bno_state.mag[0],   bno_state.mag[1],   bno_state.mag[2]);
             }
-
-            // Watchdog for BNO085 hang
-            if (gpio_get(BNO085_INT_PIN)) {
-                printf("BNO085 Hang Detected - Resetting...\n");
-                sh2_devReset();
-                i2c_bus_reset();
-                enable_report(SH2_ROTATION_VECTOR, 10000);
-            }
-
             last_print = now;
         }
 
-        sleep_ms(10); 
+        sleep_ms(500);
+        bno085_poll();
+        if (to_ms_since_boot(get_absolute_time()) - last_print > 2000) {
+            if (gpio_get(BNO085_INT_PIN)){
+            printf("sensor Sleeping (int = 1). hard reset \n");
+            sh2_devReset();
+            reset_occurred = true; 
+            }
+            last_print = to_ms_since_boot(get_absolute_time());
+        }
+
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+
+        // if bno085 starts crashing
+        if (reset_occurred) {
+            printf("reset detected, re-enabling \n");
+            sleep_ms(200);
+            reset_occurred = false;
+            
+            i2c_bus_reset();
+
+            bool reenabled = false;
+            while(!reenabled){
+                bno085_poll();
+                if(enable_report(SH2_ROTATION_VECTOR, 10000)){
+                    reenabled = true;
+                } else {
+                    printf(".");
+                    sleep_ms(100);
+                }
+            }
+            // Re-enable other reports
+            enable_report(SH2_ACCELEROMETER, 10000);
+            enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 10000);
+
+            // update watchdog timer so we don't hard reset immediately
+            last_print = to_ms_since_boot(get_absolute_time());
+        }
+        
+        sleep_ms(500);
+        bno085_poll();
+
+        // watchdog, triggers every 2000ms
+        if (to_ms_since_boot(get_absolute_time()) - last_print > 2000) {
+            if (gpio_get(BNO085_INT_PIN)){
+                printf("sensor Sleeping (int = 1). hard reset \n");
+                sh2_devReset();
+                reset_occurred = true; 
+            }
+            last_print = to_ms_since_boot(get_absolute_time());
+        }
+
+        sleep_ms(10);
     }
 }
