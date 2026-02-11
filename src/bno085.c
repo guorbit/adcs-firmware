@@ -16,7 +16,7 @@
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
 static sh2_Hal_t HAL;
-static bool reset_occurred = false;
+volatile bool reset_occurred = false;
 static bool bno085_has_new = false;
 static sh2_SensorValue_t sensorValue; // initialise struct of type sh2_SensorValue_t
 static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is pointer to the struct provided by the sh2 driver
@@ -27,6 +27,11 @@ static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is point
 ///// sh2 hal, this is the protocol running on the bno085
 int sh2chal_open(sh2_Hal_t *self) {
     // Serial.println("I2C HAL open");
+    
+    // from pico sdk
+    gpio_init(BNO085_INT_PIN);
+    gpio_set_dir(BNO085_INT_PIN, GPIO_IN);
+    gpio_pull_up(BNO085_INT_PIN); // since int pin is active low
 
     uint8_t softreset_pkt[] = {
     0x05,  // length LSB
@@ -38,15 +43,29 @@ int sh2chal_open(sh2_Hal_t *self) {
 
     // initialise bool as false
     bool success = false;
+
+    // attempt to reset sensor
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
-        if (i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US)) {
+        printf("attempt %d: sending reset...\n", attempts+1);
+        sleep_ms(10);
+        int result = i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US);
+        
+        // if result is 5 bytes (softrest_pkt)
+        if (result == 5) {
+            printf("reset packet sent\n");
             success = true;
             break;
             }
+            else{
+                printf("i2c write failed. result code: %d \n", result);
+            }
         sleep_ms(30);
     }
-    if (!success) // <- if success = false
-    return -1;
+    if (!success) {// <- if success = false
+        printf("could not reset bno085\n");
+        return -1;
+    }
+
     sleep_ms(300);
     return 0;
 }
@@ -57,54 +76,50 @@ void sh2_hal_close(sh2_Hal_t *self) {
 
 int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     int write;
-
-    write = i2c_write_timeout_us(
-        BNO085_I2C, BNO085_ADDR,
-        buf, len, false,
-        I2C_TIMEOUT_US
-    );
+    write = i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
     
     if (write != (int)len) {
+        printf("debug: i2c write failed. requested length: %d, error code: %d \n", len, write);
         return 0;
     }
-    return write;
+    return len;
 }
 
 int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *timestamp_us) {
-    uint8_t header[4]; // buffer for header
     int return_value;
     uint16_t packet_size;
     uint16_t data_size;
+    
 
-    return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, header, 4, false, I2C_TIMEOUT_US);
+    if (gpio_get(BNO085_INT_PIN) != 0) {
+        // printf("pin is high, nothing to read \n");
+        return 0;
+    }
 
-    if (return_value != 4) {
-        return 0; // read failed, it should be a 4 byte header
+    return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, i2c_buffer, len, false, I2C_TIMEOUT_US);
+
+    if (return_value <= 0) {
+        return 0;
     }
 
     // getting the packet size
-    packet_size = (uint16_t)header[0] | ((uint16_t)header[1] << 8);
+    packet_size = (uint16_t)i2c_buffer[0] | ((uint16_t)i2c_buffer[1] << 8);
     packet_size &= ~0x8000;  // clear continue bit
 
-    if (packet_size > len || packet_size < 4) {
-        return 0;            // caller buffer too small or to prevent underflow
-    }
+    printf("pkt: len = %d, channel = %d \n", packet_size, i2c_buffer[2]);
 
-    // add header into the buffer
-    memcpy(i2c_buffer, header, 4);
-
-    data_size = packet_size - 4; // everything but the 4 byte header
-
-    // packet_size checks
-    if (data_size > 0) {
-        return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, i2c_buffer + 4, data_size, false, I2C_TIMEOUT_US);
-        if (return_value != data_size) {
-        return 0;
-        }
+    // caller buffer wrong size
+    if (packet_size > len || packet_size == 0) {
+        printf("packet size %d not correct \n", packet_size);
+        return 0;            
     }
 
     if (timestamp_us) {
         *timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
+    }
+
+    if (packet_size > 0 && packet_size < 100) { // Filter out the huge boot packets
+         printf("DEBUG: read packet of %d bytes. header channel: %d\n", packet_size, i2c_buffer[2]);
     }
 
     return packet_size;
@@ -113,6 +128,7 @@ int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *t
 ///// sh2 callbacks
 static void sh2_async_event_handler(void *cookie, sh2_AsyncEvent_t *event) {
     if (event->eventId == SH2_RESET) {
+        printf("reset detected \n");
         reset_occurred = true;
     }
 }
@@ -135,8 +151,12 @@ bool bno085_init(void) {
     uint8_t dummy;
     int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
+        printf("failed: i2c read error. error code: %d\n", res);
+        sleep_ms(1000);
         return false;
     }
+
+    printf("success: device acknowledged\n");
 
     // fill HAL struct
     HAL.open      = sh2chal_open;
@@ -148,14 +168,16 @@ bool bno085_init(void) {
     // open sh2, sh2_open is from the ceva sh2 api (sh2.c)
     int status = sh2_open(&HAL, sh2_async_event_handler, NULL);
     if (status != SH2_OK) {
+        printf("failed: sh2_open returned error code: %d\n", status);
+        sleep_ms(1000);
         return false;
     }
 
     // register sensor callback, also from the ceva api
     sh2_setSensorCallback(sh2_sensor_event_handler, NULL);
-
     reset_occurred = false;
 
+    printf("bno085 initialisation complete\n");
     return true;
 }
 
@@ -174,6 +196,11 @@ bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
 
     // ceva sh2 api, send cfg from pico to bno085
     int status = sh2_setSensorConfig(sensorId, &cfg);
+    
+    if (status != SH2_OK) {
+        printf("enable_report failed. error code: %d \n", status);
+        sleep_ms(1000);
+    }
     // 1 = true, 0 = false
     return (status == SH2_OK);
 }

@@ -10,11 +10,13 @@
 #define BNO085_I2C        i2c0
 #define BNO085_ADDR       0x4A
 
-#define BNO085_SDA_PIN    4
-#define BNO085_SCL_PIN    5
-#define BNO085_RST_PIN    6   // set to -1 if not used
-#define I2C_BUFFER_MAX    32
+#define BNO085_SDA_PIN    8
+#define BNO085_SCL_PIN    9
+#define BNO085_INT_PIN    6   // set to -1 if not used
+#define I2C_BUFFER_MAX    512 // 512 bytes max for buffer
 #define I2C_TIMEOUT_US    100000 // 100000 μs = 0.1s
+
+extern volatile bool reset_occurred;
 
 // sh2 hal
 int sh2chal_open(sh2_Hal_t *self);
