@@ -6,14 +6,6 @@
 #include "bmp280.h"
 #include "pico/binary_info.h"
 
-// GPIO PICO_DEFAULT_I2C_SDA_PIN (on Pico this is GP4 (pin 6)) -> SDA on BMP280
-// board
-// GPIO PICO_DEFAULT_I2C_SCK_PIN (on Pico this is GP5 (pin 7)) -> SCL on
-// BMP280 board
-// 3.3v (pin 36) -> VCC on BMP280 board
-// GND (pin 38)  -> GND on BMP280 board
-
-
 struct bmp280_calib_param {
     // temperature params
     uint16_t dig_t1;
@@ -43,14 +35,14 @@ void bmp280_init() {
     // send register number followed by its corresponding value
     buf[0] = BMP280_REG_CONFIG;
     buf[1] = reg_config_val;
-    i2c_write_blocking(i2c_default, BMP280_ADDR, buf, 2, false);
+    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, buf, 2, false);
 
     // osrs_t x1, osrs_p x4, normal mode operation
     const uint8_t reg_ctrl_meas_val = (0x01 << 5) | (0x03 << 2) | (0x03);
     // reusing the buffer
     buf[0] = BMP280_REG_CTRL_MEAS;
     buf[1] = reg_ctrl_meas_val;
-    i2c_write_blocking(i2c_default, BMP280_ADDR, buf, 2, false);
+    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, buf, 2, false);
 }
 
 // read raw data from sensor
@@ -61,8 +53,8 @@ void bmp280_read_raw(int32_t* temp, int32_t* pressure) {
 
     uint8_t buf[6];
     uint8_t reg = BMP280_REG_PRESSURE_MSB;
-    i2c_write_blocking(i2c_default, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
-    i2c_read_blocking(i2c_default, BMP280_ADDR, buf, 6, false);  // false - finished with bus
+    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
+    i2c_read_blocking(BMP280_I2C, BMP280_ADDR, buf, 6, false);  // false - finished with bus
 
     // store the 20 bit read in a 32 bit signed integer for conversion
     *pressure = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4);
@@ -72,7 +64,7 @@ void bmp280_read_raw(int32_t* temp, int32_t* pressure) {
 void bmp280_reset() {
     // reset the device with the power-on-reset procedure
     uint8_t buf[2] = { BMP280_REG_RESET, 0xB6 };
-    i2c_write_blocking(i2c_default, BMP280_ADDR, buf, 2, false);
+    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, buf, 2, false);
 }
 
 // intermediate function that calculates the fine resolution temperature
@@ -129,9 +121,9 @@ void bmp280_get_calib_params(struct bmp280_calib_param* params) {
 
     uint8_t buf[BMP280_NUM_CALIB_PARAMS] = { 0 };
     uint8_t reg = BMP280_REG_DIG_T1_LSB;
-    i2c_write_blocking(i2c_default, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
+    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
     // read in one go as register addresses auto-increment
-    i2c_read_blocking(i2c_default, BMP280_ADDR, buf, BMP280_NUM_CALIB_PARAMS, false);  // false, we're done reading
+    i2c_read_blocking(BMP280_I2C, BMP280_ADDR, buf, BMP280_NUM_CALIB_PARAMS, false);  // false, we're done reading
 
     // store these in a struct for later use
     params->dig_t1 = (uint16_t)(buf[1] << 8) | buf[0];

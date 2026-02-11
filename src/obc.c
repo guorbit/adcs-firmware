@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
@@ -20,7 +21,7 @@ static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
             if (tx_idx >= tx_len) {
                 tx_idx = 0;
             }
-            i2c_write_raw_blocking(i2c, &tx_buf[tx_idx], 1); // write raw for slave
+            i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 1); // write raw for slave
             tx_idx++;
             break;
 
@@ -36,17 +37,17 @@ static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
 void adcs_telemetry(const uint8_t *data, size_t len){
     // so stuffs isn't too long
     if (len > TX_BUF_SIZE) len = TX_BUF_SIZE;
-    memset(tx_buf, 0, TX_BUF_SIZE);
-    memcpy(tx_buf, data, len);
-    tx_len = len
+    memset((void *)tx_buf, 0, TX_BUF_SIZE);
+    memcpy((void *)tx_buf, data, len);
+    tx_len = len;
 }
 
 // initialisation
-int adcs_slave_init(void)
+void adcs_slave_init(void)
 {
     stdio_init_all();
 
-    // I2C Initialisation. Using it at 100Khz.
+    // I2C Initialisation. Using it at 50Khz for better reliability.
     i2c_init(ADCS_PORT, 100*1000);
     // sets the function of the GPIO pins (from general to i2c)
     gpio_set_function(ADCS_SDA, GPIO_FUNC_I2C);
@@ -54,9 +55,9 @@ int adcs_slave_init(void)
     gpio_pull_up(ADCS_SDA);
     gpio_pull_up(ADCS_SCL);
 
-    i2c_slave_handler_set(ADCS_PORT, adcs_slave_handler);
+    i2c_slave_init(ADCS_PORT, ADCS_ADDR, adcs_slave_handler);
 
-    const char *msg = "test message\n";
-    adcs_telemetry((const uint8_t *)msg, strlen(len));
+    const char *msg = "ADCS test data 1234567890ABCDEFG"; // 32 bytes
+    adcs_telemetry((const uint8_t *)msg, strlen(msg));
 }
 

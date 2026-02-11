@@ -7,56 +7,34 @@
  *      Author: jondurrant
  */
 
-#ifndef EXP_DECODEINT_SRC_GPS_H_
-#define EXP_DECODEINT_SRC_GPS_H_
+/*
+ * gps.h
+ *
+ * Read data location from ATGM336H-5N (C Version)
+ */
+
+#ifndef GPS_H_
+#define GPS_H_
 
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
-#include <stdint.h>
+#include <stdint.h> 
 
-
-
+// Constants
 #define GPS_BUF_LEN 1024
 
+// -- Public API --
 
-class GPS {
-public:
+// Initialize the GPS (Replaces setUp and getInstance)
+void GPS_Init(uart_inst_t *uart, uint8_t tx_pin, uint8_t rx_pin, uint32_t baud_rate);
 
-	virtual ~GPS();
+// Getters
+float GPS_GetLat(void);
+float GPS_GetLon(void);
+float GPS_GetSpeed(void);
+int GPS_GetNumSat(void);
+const char* GPS_GetTime(void);
+float GPS_GetHeight(void);
 
-	static GPS * getInstance();
-	void setUp(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud);
-
-	float getLat();
-	float getLon();
-	float getSpeed();
-	int getNumSat();
-	const char* getTime();
-	float getHeight();
-
-protected:
-	static void onUartRxCB();
-
-	void onUartRx();
-
-private:
-	GPS();
-	void decodeBuffer();
-
-
-	static GPS * pSelf;
-	uart_inst_t *pUart = NULL;
-
-	char xBuffer[GPS_BUF_LEN];
-	uint xBufferInd = 0;
-
-	float xLat = 0.0;
-	float xLon = 0.0;
-	float xSpeed = 0.0;
-	char xTime[16] = "";
-	uint xSat = 0;
-	float xHeight = 0.0;
-};
-
-#endif /* EXP_DECODEINT_SRC_GPS_H_ */
+#endif
