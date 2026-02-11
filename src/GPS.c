@@ -4,7 +4,7 @@
  * Implementation of GPS driver in C
  */
 
-#include "gps.h"
+#include "GPS.h"
 #include <stdio.h>
 #include <string.h>
 #include <minmea.h>        // Requires the minmea library

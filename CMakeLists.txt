@@ -23,6 +23,8 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 
+add_compile_options(-Dtimegm=mktime)
+
 set(PICO_BOARD pico CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
@@ -41,16 +43,22 @@ include(minnmea.cmake)
 
 add_executable(ADCS_git
     src/main.c
-    src/GPS.cpp
+    src/GPS.c
     src/bmp280.c
     src/bno085.c
+    src/obc.c
+    lib/minmea.c
+    lib/sh2_SensorValue.c
+    lib/sh2_util.c
+    lib/sh2.c
+    lib/shtp.c
 )
 
 pico_set_program_name(ADCS_git "ADCS_git")
 pico_set_program_version(ADCS_git "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(ADCS_git 0)
+pico_enable_stdio_uart(ADCS_git 1)
 pico_enable_stdio_usb(ADCS_git 1)
 
 # Add the standard library to the build
@@ -60,11 +68,11 @@ target_link_libraries(ADCS_git
 # Add the standard include files to the build
 target_include_directories(ADCS_git PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_LIST_DIR}/lib
 )
 
 # Add any user requested libraries
 target_link_libraries(ADCS_git 
-        minnmea
         hardware_i2c
         pico_i2c_slave
         hardware_uart

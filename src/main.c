@@ -36,27 +36,26 @@ int main() {
     printf("system boot\n");
 
     // initialize i2c (BMP280 and BNO085 share a bus)
-    i2c_init(i2c_default, 100 * 1000);
+    i2c_init(BNO085_I2C, 100 * 1000);
     gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(BNO085_SDA_PIN);
     gpio_pull_up(BNO085_SCL_PIN);
 
-    // initialize gps (uart)
-    GPS_Init(uart0, 0, 1, 9600);
+    // // initialize gps (uart)
+    // GPS_Init(uart0, 0, 1, 9600);
 
-    // initialize BMP280
-    bmp280_init();
-    // defined in bmp280.h
-    struct bmp280_calib_param bmp_params;
-    bmp280_get_calib_params(&bmp_params);
-    printf("BMP280 Initialized.\n");
+    // // initialize BMP280
+    // bmp280_init();
+    // // defined in bmp280.h
+    // struct bmp280_calib_param bmp_params;
+    // bmp280_get_calib_params(&bmp_params);
+    // printf("BMP280 Initialized.\n");
 
     // initialize BNO085
-    if (!bno085_init()) {
-        while(1) {
-        printf("BNO085 Init Failed!\n");
-        }
+      while(!bno085_init) {
+        sleep_ms(500);
+        printf("retrying bno085 init");
     }
 
     sh2_devReset();
@@ -64,8 +63,10 @@ int main() {
     
     for (int i = 0; i < 200; i++) {
         bno085_poll();  // poll sensor for advert packet
-        sleep_ms(100);
+        sleep_ms(1000);
     }
+
+    printf("advert packet read");
 
     // enable Reports
     enable_report(SH2_ROTATION_VECTOR, 10000);
@@ -85,21 +86,21 @@ int main() {
 
         // print data every 1 second
         if (now - last_print > 1000) {
-            // read BMP280
-            int32_t raw_temp, raw_press;
-            bmp280_read_raw(&raw_temp, &raw_press);
-            float temp = bmp280_convert_temp(raw_temp, &bmp_params) / 100.f;
-            uint32_t press = bmp280_convert_pressure(raw_press, raw_temp, &bmp_params);
+            // // read BMP280
+            // int32_t raw_temp, raw_press;
+            // bmp280_read_raw(&raw_temp, &raw_press);
+            // float temp = bmp280_convert_temp(raw_temp, &bmp_params) / 100.f;
+            // uint32_t press = bmp280_convert_pressure(raw_press, raw_temp, &bmp_params);
 
-            // print GPS
-            printf("GPS: %s,%.5f,%.5f,%.1f\n",
-                   GPS_GetTime(),
-                   GPS_GetLat(),
-                   GPS_GetLon(),
-                   GPS_GetHeight());
+            // // print GPS
+            // printf("GPS: %s,%.5f,%.5f,%.1f\n",
+            //        GPS_GetTime(),
+            //        GPS_GetLat(),
+            //        GPS_GetLon(),
+            //        GPS_GetHeight());
 
-            // print BMP
-            printf("BMP: Temp: %.2f C | Pres: %u Pa\n", temp, press);
+            // // print BMP
+            // printf("BMP: Temp: %.2f C | Pres: %u Pa\n", temp, press);
 
             // print BNO085
             if (bno085_get_report(&bno_state)) {
@@ -121,8 +122,6 @@ int main() {
             }
             last_print = to_ms_since_boot(get_absolute_time());
         }
-
-        uint32_t now = to_ms_since_boot(get_absolute_time());
 
         // if bno085 starts crashing
         if (reset_occurred) {

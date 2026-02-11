@@ -151,9 +151,10 @@ bool bno085_init(void) {
     // check device present, does bno ack ?
     uint8_t dummy;
     int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
+
     if (res <= 0) {
         printf("failed: i2c read error. error code: %d\n", res);
-        sleep_ms(1000);
+        sleep_ms(500);
         return false;
     }
 
