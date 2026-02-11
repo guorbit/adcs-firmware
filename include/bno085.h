@@ -17,6 +17,11 @@
 #define I2C_TIMEOUT_US    100000 // 100000 μs = 0.1s
 
 extern volatile bool reset_occurred;
+typedef struct {
+    float accel[3];
+    float quat[4];
+    float mag[3];
+} bno085_state_t;
 
 // sh2 hal
 int sh2chal_open(sh2_Hal_t *self);
@@ -32,7 +37,7 @@ uint32_t hal_getTimeUs(sh2_Hal_t *self);
 // bno085 driver
 bool bno085_init(void);
 bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us);
-bool bno085_get_quaternion(float *qw, float *qx, float *qy, float *qz);
+bool bno085_get_report(bno085_state_t *out);
 void bno085_poll(void);
 
 #endif

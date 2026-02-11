@@ -20,6 +20,7 @@ volatile bool reset_occurred = false;
 static bool bno085_has_new = false;
 static sh2_SensorValue_t sensorValue; // initialise struct of type sh2_SensorValue_t
 static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is pointer to the struct provided by the sh2 driver
+static bno085_state_t internal_state;
 // probably need to provide a definition for the sensor_value struct, for now look at the sh2.h file
 
 
@@ -205,25 +206,36 @@ bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
     return (status == SH2_OK);
 }
 
-bool bno085_get_quaternion(float *qw, float *qx, float *qy, float *qz) {
-    // checks 1st, will exit the function if something goes wrong
-    // if sensor_value is invalid or sensorId != rotation vector (go to struct sensor_value points to, access sensorId, check that it equals the thing)
-    if (!sensor_value || sensor_value->sensorId != SH2_ROTATION_VECTOR) {
-        return false;
-    }
-    // if false then exit, cuz no new quaternion
-    if (!bno085_has_new) {
+bool bno085_get_report(bno085_state_t *out) {
+    if(!sensor_value || !bno085_has_new) {
         return false;
     }
 
-    // set de-refed pointer to the value u get when accessing struct sensor_value points to, access relevant stuff
-    *qw = sensor_value->un.rotationVector.real;
-    *qx = sensor_value->un.rotationVector.i;
-    *qy = sensor_value->un.rotationVector.j;
-    *qz = sensor_value->un.rotationVector.k;
+    bno085_has_new = false; // reset flag
+    switch (sensor_value->sensorId) {
+        case SH2_ACCELEROMETER:
+            internal_state.accel[0] = sensor_value->un.accelerometer.x;
+            internal_state.accel[1] = sensor_value->un.accelerometer.y;
+            internal_state.accel[2] = sensor_value->un.accelerometer.z;
+            return false; // Don't return yet, wait for orientation
 
-    bno085_has_new = false;   // mark sample as consumed
-    return true;
+        case SH2_MAGNETIC_FIELD_CALIBRATED:
+            internal_state.mag[0] = sensor_value->un.magneticField.x;
+            internal_state.mag[1] = sensor_value->un.magneticField.y;
+            internal_state.mag[2] = sensor_value->un.magneticField.z;
+            return false;
+
+        case SH2_ROTATION_VECTOR:
+            internal_state.quat[0] = sensor_value->un.rotationVector.real;
+            internal_state.quat[1] = sensor_value->un.rotationVector.i;
+            internal_state.quat[2] = sensor_value->un.rotationVector.j;
+            internal_state.quat[3] = sensor_value->un.rotationVector.k;
+            
+            // Copy the whole state to the output
+            *out = internal_state;
+            return true; // Return true to trigger a print in main
+    }
+    return false;
 }
 
 void bno085_poll(void) {
