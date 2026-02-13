@@ -155,6 +155,8 @@ bool bno085_init(void) {
         return false;
     }
 
+// hello
+
     printf("success: device acknowledged\n");
 
     // fill HAL struct
