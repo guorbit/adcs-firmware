@@ -242,3 +242,4 @@ void bno085_poll(void) {
     // ask sh2 to process any pending transfers
     sh2_service();
 }
+
