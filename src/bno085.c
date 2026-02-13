@@ -107,8 +107,6 @@ int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *t
     packet_size = (uint16_t)i2c_buffer[0] | ((uint16_t)i2c_buffer[1] << 8);
     packet_size &= ~0x8000;  // clear continue bit
 
-    printf("pkt: len = %d, channel = %d \n", packet_size, i2c_buffer[2]);
-
     // caller buffer wrong size
     if (packet_size > len || packet_size == 0) {
         printf("packet size %d not correct \n", packet_size);
@@ -119,8 +117,8 @@ int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *t
         *timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
     }
 
-    if (packet_size > 0 && packet_size < 100) { // Filter out the huge boot packets
-         printf("DEBUG: read packet of %d bytes. header channel: %d\n", packet_size, i2c_buffer[2]);
+    if (packet_size < 0 && packet_size > 100) { // Filter out the huge boot packets
+         printf("pkt: len = %d, channel = %d \n", packet_size, i2c_buffer[2]);
     }
 
     return packet_size;
@@ -151,10 +149,9 @@ bool bno085_init(void) {
     // check device present, does bno ack ?
     uint8_t dummy;
     int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
-
     if (res <= 0) {
         printf("failed: i2c read error. error code: %d\n", res);
-        sleep_ms(500);
+        sleep_ms(1000);
         return false;
     }
 

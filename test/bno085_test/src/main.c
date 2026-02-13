@@ -43,8 +43,8 @@ int main(void) {
     // sensor initialisation   
     while(!bno085_init()) {
         printf("retry bno085 init\n");
-        i2c_bus_reset;
-        sh2_devReset;
+        i2c_bus_reset();
+        sh2_devReset();
         sleep_ms(1000);
     }
 
@@ -127,7 +127,7 @@ int main(void) {
         sleep_ms(500);
         bno085_poll();
         if (to_ms_since_boot(get_absolute_time()) - last_print > 2000) {
-            if (gpio_get(BNO085_INT_PIN)){
+            if (gpio_get(BNO085_INT_PIN) == 1){
             printf("sensor Sleeping (int = 1). hard reset \n");
             sh2_devReset();
             reset_occurred = true; 

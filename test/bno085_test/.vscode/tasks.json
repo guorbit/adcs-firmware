@@ -24,7 +24,7 @@
             "args": [
                 "load",
                 "${command:raspberry-pi-pico.launchTargetPath}",
-                "-x"
+                "-fx"
             ],
             "presentation": {
                 "reveal": "always",
