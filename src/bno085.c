@@ -13,6 +13,8 @@
 #include "sh2_err.h"
 #include "sh2_hal.h"
 
+// hello
+
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
 static sh2_Hal_t HAL;
