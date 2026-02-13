@@ -6,8 +6,6 @@
 #include "pico/binary_info.h"
 #include "bno085.h"
 
-// Hello
-
 // sh2 libraries https://github.com/ceva-dsp/sh2
 // based on this library https://github.com/robotcopper/BNO08x_Pico_Library, i took out a lot of stuff though
 #include "sh2.h"
@@ -244,3 +242,4 @@ void bno085_poll(void) {
     // ask sh2 to process any pending transfers
     sh2_service();
 }
+
