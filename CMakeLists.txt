@@ -43,7 +43,7 @@ include(minnmea.cmake)
 
 add_executable(ADCS_git
     src/main.c
-    src/GPS.cpp
+    src/gtu7.c
     src/bmp280.c
     src/bno085.c
     src/obc.c
