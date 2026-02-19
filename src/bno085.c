@@ -13,7 +13,7 @@
 #include "sh2_err.h"
 #include "sh2_hal.h"
 
-// hello
+#include "hardware/gpio.h"
 
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
@@ -47,6 +47,24 @@ int sh2chal_open(sh2_Hal_t *self) {
     // initialise bool as false
     bool success = false;
 
+    // ensure I2C pins are using I2C function and pulled up
+    gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(BNO085_SDA_PIN);
+    gpio_pull_up(BNO085_SCL_PIN);
+
+    // if we have a hardware reset pin, pulse it to ensure sensor is in a known state
+    if (BNO085_RST_PIN >= 0) {
+        gpio_init(BNO085_RST_PIN);
+        gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
+        // drive low to reset
+        gpio_put(BNO085_RST_PIN, 0);
+        sleep_ms(10);
+        // release
+        gpio_put(BNO085_RST_PIN, 1);
+        sleep_ms(50);
+    }
+
     // attempt to reset sensor
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
         printf("attempt %d: sending reset...\n", attempts+1);
@@ -66,6 +84,36 @@ int sh2chal_open(sh2_Hal_t *self) {
     }
     if (!success) {// <- if success = false
         printf("could not reset bno085\n");
+        // Attempt a bus recovery before giving up
+        printf("attempting I2C bus recovery\n");
+        // temporarily drive SCL/SDA as GPIO and clock out stuck devices
+        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_SIO);
+        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_SIO);
+        gpio_pull_up(BNO085_SDA_PIN);
+        gpio_pull_up(BNO085_SCL_PIN);
+        gpio_set_dir(BNO085_SCL_PIN, GPIO_OUT);
+        gpio_set_dir(BNO085_SDA_PIN, GPIO_IN);
+        for (int i = 0; i < 9; i++) {
+            gpio_put(BNO085_SCL_PIN, 1);
+            sleep_us(5);
+            gpio_put(BNO085_SCL_PIN, 0);
+            sleep_us(5);
+        }
+        // generate STOP condition
+        gpio_set_dir(BNO085_SDA_PIN, GPIO_OUT);
+        gpio_put(BNO085_SDA_PIN, 0);
+        sleep_us(5);
+        gpio_put(BNO085_SCL_PIN, 1);
+        sleep_us(5);
+        gpio_put(BNO085_SDA_PIN, 1);
+        sleep_us(5);
+
+        // restore pins to I2C and return error
+        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
+        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
+        gpio_pull_up(BNO085_SDA_PIN);
+        gpio_pull_up(BNO085_SCL_PIN);
+
         return -1;
     }
 
@@ -153,8 +201,42 @@ bool bno085_init(void) {
     int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
         printf("failed: i2c read error. error code: %d\n", res);
-        sleep_ms(1000);
-        return false;
+        printf("attempting I2C bus recovery and re-init\n");
+
+        // perform simple bus recovery: clock SCL up to 9 pulses then STOP
+        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_SIO);
+        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_SIO);
+        gpio_pull_up(BNO085_SDA_PIN);
+        gpio_pull_up(BNO085_SCL_PIN);
+        gpio_set_dir(BNO085_SCL_PIN, GPIO_OUT);
+        gpio_set_dir(BNO085_SDA_PIN, GPIO_IN);
+        for (int i = 0; i < 9; i++) {
+            gpio_put(BNO085_SCL_PIN, 1);
+            sleep_us(5);
+            gpio_put(BNO085_SCL_PIN, 0);
+            sleep_us(5);
+        }
+        gpio_set_dir(BNO085_SDA_PIN, GPIO_OUT);
+        gpio_put(BNO085_SDA_PIN, 0);
+        sleep_us(5);
+        gpio_put(BNO085_SCL_PIN, 1);
+        sleep_us(5);
+        gpio_put(BNO085_SDA_PIN, 1);
+        sleep_us(5);
+
+        // restore I2C function and re-init
+        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
+        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
+        gpio_pull_up(BNO085_SDA_PIN);
+        gpio_pull_up(BNO085_SCL_PIN);
+        i2c_init(BNO085_I2C, 100000);
+
+        // retry once
+        res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
+        if (res <= 0) {
+            sleep_ms(1000);
+            return false;
+        }
     }
 
     printf("success: device acknowledged\n");
@@ -242,4 +324,3 @@ void bno085_poll(void) {
     // ask sh2 to process any pending transfers
     sh2_service();
 }
-

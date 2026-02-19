@@ -22,6 +22,7 @@ set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
+# ====================================================================================
 
 add_compile_options(-Dtimegm=mktime)
 
@@ -46,6 +47,7 @@ add_executable(ADCS_git
     src/GPS.cpp
     src/bmp280.c
     src/bno085.c
+    src/i2c_utils.c
     src/obc.c
     lib/minmea.c
     lib/sh2_SensorValue.c
@@ -61,22 +63,19 @@ pico_set_program_version(ADCS_git "0.1")
 pico_enable_stdio_uart(ADCS_git 1)
 pico_enable_stdio_usb(ADCS_git 1)
 
-# Add the standard library to the build
-target_link_libraries(ADCS_git
-        pico_stdlib)
+# Add any user requested libraries
+target_link_libraries(ADCS_git 
+        pico_stdlib
+        hardware_i2c
+        pico_i2c_slave
+        hardware_uart
+        hardware_irq
+        )
 
 # Add the standard include files to the build
 target_include_directories(ADCS_git PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
         ${CMAKE_CURRENT_LIST_DIR}/lib
 )
-
-# Add any user requested libraries
-target_link_libraries(ADCS_git 
-        hardware_i2c
-        pico_i2c_slave
-        hardware_uart
-        hardware_irq
-        )
 
 pico_add_extra_outputs(ADCS_git)
