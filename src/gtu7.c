@@ -15,8 +15,9 @@
 // initialise storage struct
 static gps_data_t gps_state = {0};
 
-void gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
-	uart_init(uart, baud);
+bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
+    uint16_t return_baud = uart_init(uart, baud);
+    printf("baud rate: %d\n",return_baud);
 
 	// set the TX and RX pins
 	gpio_set_function(tx, UART_FUNCSEL_NUM(uart, tx));
@@ -24,6 +25,9 @@ void gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
 
 	// set UART flow control CTS/RTS
 	uart_set_hw_flow(uart, false, false);
+    bool uart_status = uart_is_enabled(GTU7_UART);
+    printf("uart enabled: %d\n", uart_status);
+    return uart_status;
 }
 
 gps_data_t gps_data(void){

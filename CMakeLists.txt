@@ -58,7 +58,7 @@ pico_set_program_name(ADCS_git "ADCS_git")
 pico_set_program_version(ADCS_git "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(ADCS_git 1)
+pico_enable_stdio_uart(ADCS_git 0)
 pico_enable_stdio_usb(ADCS_git 1)
 
 # Add the standard library to the build
