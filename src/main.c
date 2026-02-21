@@ -209,6 +209,7 @@
 #include "hardware/i2c.h"
 #include "bno085.h"
 #include "sh2.h"
+#include "bmp280.h"
 
 // i need to solder on a 1uf capacitor to prevent brownouts
 void i2c_bus_reset() {
@@ -292,6 +293,13 @@ int main(void) {
     uint32_t last_print = 0;
     uint32_t last_data_print = 0;
     bno085_state_t state;
+
+    // Initialise BMP280
+    printf("Initialising BMP280...\n");
+    bmp280_init();
+    printf("BMP280 initialised successfully!\n");
+
+
     // main loop
     while (1) {
         bno085_poll();
