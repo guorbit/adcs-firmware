@@ -15,6 +15,7 @@
 
 #ifndef MINMEA_MAX_SENTENCE_LENGTH
 #define MINMEA_MAX_SENTENCE_LENGTH 80
+#endif
 
 // struct to store gps data into
 typedef struct {
@@ -23,11 +24,13 @@ typedef struct {
     float speed;
     float alt;
     float time;
+    int fix_quality;
 } gps_data_t;
 
 // function declarations
 bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud);
 gps_data_t gps_data(void);
+bool read_uart(char *line, int max_length);
 void gps_get_sentence(char *line); // Call this when data arrives
 
 

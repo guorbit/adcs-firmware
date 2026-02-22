@@ -34,6 +34,23 @@ gps_data_t gps_data(void){
     return gps_state;
 }
 
+bool read_uart(char *line, int max_length){
+    static uint16_t index = 0;
+
+    while (uart_is_readable(GTU7_UART)){
+        char getc = uart_getc(GTU7_UART);
+
+        if (getc == '\n'){
+            line[index] = '\0';
+            index = 0;
+            return true;
+        } else if (getc != '\r' && index < max_length - 1){
+            line[index++] = getc;
+        }
+    }
+    return false;
+}
+
 void gps_get_sentence(char *line) {
     switch (minmea_sentence_id(line, false)) {
         case MINMEA_SENTENCE_RMC: {
@@ -49,7 +66,7 @@ void gps_get_sentence(char *line) {
         case MINMEA_SENTENCE_GGA: {
             struct minmea_sentence_gga frame;
             if (minmea_parse_gga(&frame, line)) {
-                frame.fix_quality = frame.fix_quality;
+                gps_state.fix_quality = frame.fix_quality;
             }
         } break;
     }

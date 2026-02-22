@@ -163,4 +163,10 @@ int main(void) {
     }
     printf("init successful\n");
 
+    char line[MINMEA_MAX_SENTENCE_LENGTH];
+
+    while(1) {
+        gps_get_sentence(line);
+    }
+
 }
