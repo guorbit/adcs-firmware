@@ -7,15 +7,12 @@
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
 
+#include "minmea.h"
+
 #define GTU7_BAUD 9600
 #define GTU7_RX 16 // gpio 16 rpi pico tx
 #define GTU7_TX 17// gpio 17 rpi pico rx
 #define GTU7_UART uart0
-
-
-#ifndef MINMEA_MAX_SENTENCE_LENGTH
-#define MINMEA_MAX_SENTENCE_LENGTH 80
-#endif
 
 // struct to store gps data into
 typedef struct {
@@ -23,7 +20,9 @@ typedef struct {
     float lon;
     float speed;
     float alt;
-    float time;
+    float hour;
+    float min;
+    float sec;
     int fix_quality;
 } gps_data_t;
 
