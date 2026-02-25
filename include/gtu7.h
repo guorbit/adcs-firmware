@@ -20,9 +20,9 @@ typedef struct {
     float lon;
     float speed;
     float alt;
-    float hour;
-    float min;
-    float sec;
+    int hour;
+    int min;
+    int sec;
     int fix_quality;
 } gps_data_t;
 
