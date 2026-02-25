@@ -207,43 +207,26 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
+
+#include "bmp280.h"
 #include "bno085.h"
 #include "sh2.h"
 #include "bmp280.h"
 
-// i need to solder on a 1uf capacitor to prevent brownouts
-void i2c_bus_reset() {
-    printf("resetting i2c bus\n");
-    // Disable I2C hardware briefly
-    i2c_deinit(BNO085_I2C);
-    
-    // Manual toggle of SCL to clear stuck SDA
-    gpio_init(BNO085_SCL_PIN);
-    gpio_init(BNO085_SDA_PIN);
-    gpio_set_dir(BNO085_SCL_PIN, GPIO_OUT);
-    for (int i = 0; i < 10; i++) {
-        gpio_put(BNO085_SCL_PIN, 0); sleep_us(5);
-        gpio_put(BNO085_SCL_PIN, 1); sleep_us(5);
-    }
-    
-    // Re-initialize I2C
-    i2c_init(BNO085_I2C, 100 * 1000);
-    gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
-}
-
 int main(void) {
+    // Initialize UART for debugging output
     stdio_init_all();
-
-    sleep_ms(3000);   // allow usb to enumerate
-    printf("\nsystem boot\n");
-
-    // i2c setup
+    
+    // Wait a moment for USB to initialize
+    sleep_ms(10000);
+    
+    // init i2c for bmp280 and bno085
     i2c_init(BNO085_I2C, 100 * 1000);
     gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(BNO085_SDA_PIN);
     gpio_pull_up(BNO085_SCL_PIN);
+<<<<<<< HEAD
 
     printf("Starting BNO085\n");
 
@@ -446,6 +429,8 @@ int main() {
     gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
     gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+=======
+>>>>>>> b69124a (integration of bmp280 driver)
     
     printf("I2C initialized on pins SDA=%d, SCL=%d\n", PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN);
     
@@ -462,19 +447,23 @@ int main() {
     
     // Reset the BMP280
     bmp280_reset();
-    sleep_ms(100);  //wait after reset
+    sleep_ms(1000);  //wait after reset
+    printf("bmp280 reset\n");
     
     // Initialize the BMP280
     bmp280_init();
-    sleep_ms(100);  //wait after init
+    sleep_ms(1000);  //wait after init
+    printf("bmp280 initialised\n");
     
     // Read calibration parameters
     struct bmp280_calib_param calib_params;
     bmp280_get_calib_params(&calib_params);
+    // print struct for debug/info
     printf("Calibration parameters loaded\n");
     printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
     printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
     
+    // main loop
     while (1) {
         int32_t raw_temp, raw_pressure;
         bmp280_read_raw(&raw_temp, &raw_pressure);
@@ -484,12 +473,11 @@ int main() {
         
         float temperature = temp_c / 100.0f;
         
-        printf("%.2f\t\t%lu\n", temperature, pressure_pa);
+        printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
         
         sleep_ms(1000);
     }
     
     return 0;
+    
 }
-// hello testing
-*/

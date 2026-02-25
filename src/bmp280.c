@@ -6,6 +6,8 @@
 #include "bmp280.h"
 #include "pico/binary_info.h"
 
+// based on https://github.com/raspberrypi/pico-examples/tree/master/i2c/bmp280_i2c
+
 void bmp280_init() {
     // 2 byte buffer, [reg addr, reg val]
     uint8_t buf[2];
