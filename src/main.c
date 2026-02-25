@@ -11,6 +11,7 @@
 #include "sh2.h"
 #include "gtu7.h"
 
+// stores raw nmea sentences
 char line[MINMEA_MAX_SENTENCE_LENGTH];
 
 int main(void) {
@@ -55,27 +56,31 @@ int main(void) {
     
     // main loop
     while (1) {
-        int32_t raw_temp, raw_pressure;
-        bmp280_read_raw(&raw_temp, &raw_pressure);
-        
-        int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
-        uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
-        
-        float temperature = temp_c / 100.0f;
-        
-        printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
-
         if (read_uart(line, MINMEA_MAX_SENTENCE_LENGTH) == true) {
-            printf("nmea sentence: %s\n", line);
-            // translate gps data
+            // saving gps state into struct gps_data
             gps_get_sentence(line);
+        }
+
+        static uint32_t last_print_time = 0;
+        if(to_ms_since_boot(get_absolute_time()) - last_print_time > 1000){
+            last_print_time = to_ms_since_boot(get_absolute_time());
+
+            // read bmp280
+            int32_t raw_temp, raw_pressure;
+            bmp280_read_raw(&raw_temp, &raw_pressure);
+            int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
+            uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
+            float temperature = temp_c / 100.0f;
+            
             // copy data from gps_data into gps
             gps_data_t gps = gps_data();
-            printf("UTC: %02d:%02d:%02d | Lat: %d, Lon: %d, Alt: %.2fm, Fix: %d\n", 
-            gps.hour, gps.min, gps.sec, gps.lat, gps.lon, gps.alt, gps.fix_quality);
-        } 
+
+            printf("T: %.2fC | P: %luPa | UTC: %02d:%02d:%02d | Lat: %.6f | Lon: %.6f | Alt: %.2fm | Fix: %d\n", 
+            temperature, pressure_pa, 
+            gps.hour, gps.min, gps.sec, 
+            gps.lat, gps.lon, gps.alt, gps.fix_quality);
+        }
         sleep_ms(1);
     }
-    
     return 0;
 }
