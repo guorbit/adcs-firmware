@@ -63,6 +63,12 @@ pico_set_program_version(ADCS_git "0.1")
 pico_enable_stdio_uart(ADCS_git 1)
 pico_enable_stdio_usb(ADCS_git 1)
 
+# Specify uart0 pins 16 and 17 as default
+TARGET_COMPILE_DEFINITIONS(ADCS_git PRIVATE 
+    PICO_DEFAULT_UART_TX_PIN=16
+    PICO_DEFAULT_UART_RX_PIN=17)
+
+
 # Add any user requested libraries
 target_link_libraries(ADCS_git 
         pico_stdlib
