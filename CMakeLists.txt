@@ -35,6 +35,7 @@ project(ADCS_git C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
+add_definitions(-DPICO_I2C_DEFAULT_TIMEOUT_US=1000000)
 
 # Add GPS module - PUT IT HERE (after pico_sdk_init)
 set(MINNMEA_PATH "${CMAKE_CURRENT_LIST_DIR}/lib")
@@ -44,7 +45,7 @@ include(minnmea.cmake)
 
 add_executable(ADCS_git
     src/main.c
-    src/GPS.cpp
+    src/GPS.c
     src/bmp280.c
     src/bno085.c
     src/i2c_utils.c
@@ -60,7 +61,7 @@ pico_set_program_name(ADCS_git "ADCS_git")
 pico_set_program_version(ADCS_git "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(ADCS_git 1)
+pico_enable_stdio_uart(ADCS_git 0)
 pico_enable_stdio_usb(ADCS_git 1)
 
 # Specify uart0 pins 16 and 17 as default

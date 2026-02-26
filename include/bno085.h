@@ -13,7 +13,7 @@
 #define BNO085_SDA_PIN    8
 #define BNO085_SCL_PIN    9
 #define BNO085_INT_PIN    6   // set to -1 if not used
-#define BNO085_RST_PIN    5   // currently connected by jumper cable...
+#define BNO085_RST_PIN    5   // currently connected by enamel wire
 #define I2C_BUFFER_MAX    512 // 512 bytes max for buffer
 #define I2C_TIMEOUT_US    100000 // 100000 μs = 0.1s, exceeding results in pico timeout error
 
