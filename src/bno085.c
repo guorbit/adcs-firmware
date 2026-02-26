@@ -306,6 +306,12 @@ bool bno085_get_report(bno085_state_t *out) {
             internal_state.mag[2] = sensor_value->un.magneticField.z;
             return false;
 
+        case SH2_MAGNETIC_FIELD_UNCALIBRATED:
+        internal_state.mag[0] = sensor_value->un.magneticFieldUncal.x;
+        internal_state.mag[1] = sensor_value->un.magneticFieldUncal.y;
+        internal_state.mag[2] = sensor_value->un.magneticFieldUncal.z;
+        return false;
+
         case SH2_ROTATION_VECTOR:
             internal_state.quat[0] = sensor_value->un.rotationVector.real;
             internal_state.quat[1] = sensor_value->un.rotationVector.i;
@@ -315,7 +321,7 @@ bool bno085_get_report(bno085_state_t *out) {
             // Copy the whole state to the output
             *out = internal_state;
             return true; // Return true to trigger a print in main
-    }
+}
     return false;
 }
 
