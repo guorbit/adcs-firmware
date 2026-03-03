@@ -60,8 +60,8 @@ int main(void) {
     }
 
     // force reset the sensor for advert packet
-    sh2_devReset();
-    sleep_ms(200);
+    // sh2_devReset();
+    // sleep_ms(200);
 
     for (int i = 0; i < 200; i++) {
         // printf("int pin state: %d \n", gpio_get(BNO085_INT_PIN));
@@ -94,58 +94,61 @@ int main(void) {
     printf("BNO085 ready v6\n");
     sleep_ms(100);
 
-    uint32_t last_print = 0;
-    uint32_t last_data_print = 0;
     bno085_state_t state;
+    uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // For the watchdog
+    uint32_t last_data_print = 0; // For printing
+    static float last_qx, last_qy, last_qz;
+    static int stale_count = 0;
     // main loop
     while (1) {
         bno085_poll();
 
+        // timer for print and watchdog
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+
         float qw, qx, qy, qz;
         if (bno085_get_report(&state)) {
-            // ONLY print if 1000ms have passed
-            uint32_t now = to_ms_since_boot(get_absolute_time());
+            // reset watchdog
+            last_sensor_read = now;
+
+            if (state.status == 0){
+                if (++stale_count > 100) {
+                    printf("data unreliable for 1s, running sh2_devReset\n");
+                    sh2_devReset();
+                    stale_count = 0; // reset flag
+                }
+            } else {
+                // reset flag, otherwise it's pretty easy to get stale_count == 0 and trigger a reset
+                stale_count = 0; 
+            }
+            
+            // print data, rate limited atm
             if (now - last_data_print > 1000) {
 
-                printf("acc: %.2f %.2f %.2f | quat: %.2f %.2f %.2f %.2f | mag: %.1f %.1f %.1f\n",
-                state.accel[0], state.accel[1], state.accel[2],
-                state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
-                state.mag[0],   state.mag[1],   state.mag[2]);
+                printf("status: %d | acc: %.2f %.2f %.2f | quat: %.2f %.2f %.2f %.2f | mag: %.1f %.1f %.1f\n",
+                    state.status,
+                    state.accel[0], state.accel[1], state.accel[2],
+                    state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
+                    state.mag[0],   state.mag[1],   state.mag[2]);
 
                 last_data_print = now;
             }
         }
+
+        // reset stuffs
+        if (now - last_sensor_read > 5000) {
+            printf("watchdog timeout, resetting hardware");
+            if (bno085_hw_reset()) {
+                // reset timer so we don't meet if statement condition immediately and get stuck
+                last_sensor_read = now;
+            } else {
+                printf("bno085_hw_reset failed, starting next loop");
+            }
+        } else if (reset_occurred) {
+            bno085_reset(); // resets reports and the flag
+            last_sensor_read = now;
+        } 
         
-        // if (reset_occurred) {
-        //     printf("reset detected, re-enabling \n");
-        //     sleep_ms(200);
-        //     reset_occurred = false;
-            
-        //     i2c_bus_reset(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
-
-        //     bool reenabled = false;
-        //     while(!reenabled){
-        //         bno085_poll();
-        //         if(enable_report(SH2_ROTATION_VECTOR, 10000)){
-        //             reenabled = true;
-        //         } else {
-        //             printf(".");
-        //             sleep_ms(100);
-        //         }
-        //     }
-        // }
-
-        // sleep_ms(10);
-        // bno085_poll();
-        // if (to_ms_since_boot(get_absolute_time()) - last_print > 2000) {
-        //     if (gpio_get(BNO085_INT_PIN) == 1){
-        //     printf("sensor Sleeping (int = 1). hard reset \n");
-        //     sh2_devReset();
-        //     reset_occurred = true; 
-        //     }
-        //     last_print = to_ms_since_boot(get_absolute_time());
-        // }
-
         sleep_ms(5);
     }
     

@@ -64,7 +64,7 @@ int sh2chal_open(sh2_Hal_t *self) {
         sleep_ms(50);
     }
 
-    // attempt to reset sensor
+    // attempt to reset sensor, this is the main point of this function
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
         printf("attempt %d: sending reset...\n", attempts+1);
         sleep_ms(10);
@@ -81,38 +81,10 @@ int sh2chal_open(sh2_Hal_t *self) {
             }
         sleep_ms(30);
     }
-    if (!success) {// <- if success = false
-        printf("could not reset bno085\n");
-        // Attempt a bus recovery before giving up
-        printf("attempting I2C bus recovery\n");
-        // temporarily drive SCL/SDA as GPIO and clock out stuck devices
-        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_SIO);
-        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_SIO);
-        gpio_pull_up(BNO085_SDA_PIN);
-        gpio_pull_up(BNO085_SCL_PIN);
-        gpio_set_dir(BNO085_SCL_PIN, GPIO_OUT);
-        gpio_set_dir(BNO085_SDA_PIN, GPIO_IN);
-        for (int i = 0; i < 9; i++) {
-            gpio_put(BNO085_SCL_PIN, 1);
-            sleep_us(5);
-            gpio_put(BNO085_SCL_PIN, 0);
-            sleep_us(5);
-        }
-        // generate STOP condition
-        gpio_set_dir(BNO085_SDA_PIN, GPIO_OUT);
-        gpio_put(BNO085_SDA_PIN, 0);
-        sleep_us(5);
-        gpio_put(BNO085_SCL_PIN, 1);
-        sleep_us(5);
-        gpio_put(BNO085_SDA_PIN, 1);
-        sleep_us(5);
 
-        // restore pins to I2C and return error
-        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
-        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
-        gpio_pull_up(BNO085_SDA_PIN);
-        gpio_pull_up(BNO085_SCL_PIN);
-
+    if (!success) {
+        printf("sh2chal_open failed, resetting i2c bus\n");
+        i2c_bus_reset(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
         return -1;
     }
 
@@ -199,43 +171,9 @@ bool bno085_init(void) {
     uint8_t dummy;
     int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
-        printf("failed: i2c read error. error code: %d\n", res);
-        printf("attempting I2C bus recovery and re-init\n");
-
-        // perform simple bus recovery: clock SCL up to 9 pulses then STOP
-        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_SIO);
-        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_SIO);
-        gpio_pull_up(BNO085_SDA_PIN);
-        gpio_pull_up(BNO085_SCL_PIN);
-        gpio_set_dir(BNO085_SCL_PIN, GPIO_OUT);
-        gpio_set_dir(BNO085_SDA_PIN, GPIO_IN);
-        for (int i = 0; i < 9; i++) {
-            gpio_put(BNO085_SCL_PIN, 1);
-            sleep_us(5);
-            gpio_put(BNO085_SCL_PIN, 0);
-            sleep_us(5);
-        }
-        gpio_set_dir(BNO085_SDA_PIN, GPIO_OUT);
-        gpio_put(BNO085_SDA_PIN, 0);
-        sleep_us(5);
-        gpio_put(BNO085_SCL_PIN, 1);
-        sleep_us(5);
-        gpio_put(BNO085_SDA_PIN, 1);
-        sleep_us(5);
-
-        // restore I2C function and re-init
-        gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
-        gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
-        gpio_pull_up(BNO085_SDA_PIN);
-        gpio_pull_up(BNO085_SCL_PIN);
-        i2c_init(BNO085_I2C, 100000);
-
-        // retry once
-        res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
-        if (res <= 0) {
-            sleep_ms(1000);
-            return false;
-        }
+       printf("failed: bno085 didn't ack. error code : %d\n", res);
+       sleep_ms(100);
+       return false; // return to main.c
     }
 
     printf("success: device acknowledged\n");
@@ -292,6 +230,8 @@ bool bno085_get_report(bno085_state_t *out) {
         return false;
     }
 
+    // uint8_t status; /**< @brief bits 7-5: reserved, 4-2: exponent delay, 1-0: Accuracy */, so use a mask for just accuracy
+    internal_state.status[1] =  (sensor_value->status & 0x03);
     bno085_has_new = false; // reset flag
     switch (sensor_value->sensorId) {
         case SH2_ACCELEROMETER:
@@ -328,4 +268,52 @@ bool bno085_get_report(bno085_state_t *out) {
 void bno085_poll(void) {
     // ask sh2 to process any pending transfers
     sh2_service();
+}
+
+// reset stuff, trying to keep it in one place
+void bno085_reset(void) {
+    // handles the reset_occured flag, re-inits the reports
+    printf("sensor reset detected, re-enabling reports (bno085_reset)");
+
+    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
+        while(1){
+            printf("could not enable rotation vector\n");
+            sleep_ms(1000);
+        }
+    }
+    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
+        while(1){
+            printf("could not enable accelerometer\n");
+            sleep_ms(1000);
+        }
+    }
+    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
+        while(1){
+            printf("could not enable magnetometer\n");
+            sleep_ms(1000);
+        }
+    }
+
+    // reset the flag
+    reset_occurred = false;
+}
+
+bool bno085_hw_reset(void) {
+    gpio_init(BNO085_RST_PIN);
+    gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
+    // drive low to reset
+    gpio_put(BNO085_RST_PIN, 0);
+    sleep_ms(20);
+    // release
+    gpio_put(BNO085_RST_PIN, 1);
+    sleep_ms(200);
+
+    // need to re-init
+    if (bno085_init()){
+        return true;
+    } else {
+        printf("bno085_hw_reset failed to re-initialise\n");
+        return false;
+    }
+    sleep_ms(2000);
 }
