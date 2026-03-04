@@ -6,6 +6,8 @@
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
 
+
+#include "bmp280.h"
 #include "bno085.h"
 
 #define GTU7_BAUD 9600
@@ -23,6 +25,7 @@ void setup_uart() {
 }
 
 int main(void) {
+    // Initialize UART for debugging output
     stdio_init_all();
     setup_uart();
 
@@ -39,12 +42,57 @@ int main(void) {
     gpio_put(BNO085_RST_PIN, 1);
     sleep_ms(2000);
 
-    // i2c setup
+    // init i2c for bmp280 and bno085
     i2c_init(BNO085_I2C, 100 * 1000);
     gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(BNO085_SDA_PIN);
     gpio_pull_up(BNO085_SCL_PIN);
+    
+    printf("I2C initialized on pins SDA=%d, SCL=%d\n", PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN);
+    
+    // Test I2C communication - try to read from BMP280
+    uint8_t test_buf[1];
+    int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
+    printf("I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    
+    if (ret < 0) {
+        printf("Trying alternate address 0x77...\n");
+        ret = i2c_read_blocking(i2c_default, 0x77, test_buf, 1, false);
+        printf("I2C read test (addr 0x77): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    }
+    
+    // Reset the BMP280
+    bmp280_reset();
+    sleep_ms(1000);  //wait after reset
+    printf("bmp280 reset\n");
+    
+    // Initialize the BMP280
+    bmp280_init();
+    sleep_ms(1000);  //wait after init
+    printf("bmp280 initialised\n");
+    
+    // Read calibration parameters
+    struct bmp280_calib_param calib_params;
+    bmp280_get_calib_params(&calib_params);
+    // print struct for debug/info
+    printf("Calibration parameters loaded\n");
+    printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
+    printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
+    
+    // main loop
+    while (1) {
+        int32_t raw_temp, raw_pressure;
+        bmp280_read_raw(&raw_temp, &raw_pressure);
+        
+        int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
+        uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
+        
+        float temperature = temp_c / 100.0f;
+        
+        printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
+        
+        sleep_ms(1000);
 
     // print devices visible on the bus
     i2c_bus_scan(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
