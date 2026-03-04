@@ -23,7 +23,7 @@ typedef struct {
     float accel[3];
     float quat[4];
     float mag[3];
-    float status[1];
+    int8_t status[1];
 } bno085_state_t;
 
 // sh2 hal

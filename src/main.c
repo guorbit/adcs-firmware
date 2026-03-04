@@ -115,6 +115,7 @@ int main(void) {
                 if (++stale_count > 100) {
                     printf("data unreliable for 1s, running sh2_devReset\n");
                     sh2_devReset();
+                    // re-init sensor ?
                     stale_count = 0; // reset flag
                 }
             } else {
@@ -126,7 +127,7 @@ int main(void) {
             if (now - last_data_print > 1000) {
 
                 printf("status: %d | acc: %.2f %.2f %.2f | quat: %.2f %.2f %.2f %.2f | mag: %.1f %.1f %.1f\n",
-                    state.status,
+                    state.status[0],
                     state.accel[0], state.accel[1], state.accel[2],
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
                     state.mag[0],   state.mag[1],   state.mag[2]);
@@ -137,12 +138,14 @@ int main(void) {
 
         // reset stuffs
         if (now - last_sensor_read > 5000) {
-            printf("watchdog timeout, resetting hardware");
+            printf("watchdog timeout, resetting hardware\n");
             if (bno085_hw_reset()) {
                 // reset timer so we don't meet if statement condition immediately and get stuck
                 last_sensor_read = now;
             } else {
-                printf("bno085_hw_reset failed, starting next loop");
+                printf("bno085_hw_reset failed, starting next loop\n");
+                last_sensor_read = now;
+                continue;
             }
         } else if (reset_occurred) {
             bno085_reset(); // resets reports and the flag

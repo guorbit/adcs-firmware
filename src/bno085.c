@@ -3,7 +3,8 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/binary_info.h"
-#include "bno085.h"
+#include "i2c_utils.h"
+#include "hardware/gpio.h"
 
 // sh2 libraries https://github.com/ceva-dsp/sh2
 // based on this library https://github.com/robotcopper/BNO08x_Pico_Library, i took out a lot of stuff though
@@ -11,8 +12,7 @@
 #include "sh2_SensorValue.h"
 #include "sh2_err.h"
 #include "sh2_hal.h"
-
-#include "hardware/gpio.h"
+#include "bno085.h"
 
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
@@ -77,7 +77,7 @@ int sh2chal_open(sh2_Hal_t *self) {
             break;
             }
             else{
-                printf("i2c write failed. result code: %d \n", result);
+                printf("i2c_write_timeout_us failed. error code: %d \n", result);
             }
         sleep_ms(30);
     }
@@ -101,7 +101,7 @@ int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     write = i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
     
     if (write != (int)len) {
-        printf("debug: i2c write failed. requested length: %d, error code: %d \n", len, write);
+        printf("i2c write failed. requested length: %d, error code: %d \n", len, write);
         return 0;
     }
     return len;
@@ -188,7 +188,7 @@ bool bno085_init(void) {
     // open sh2, sh2_open is from the ceva sh2 api (sh2.c)
     int status = sh2_open(&HAL, sh2_async_event_handler, NULL);
     if (status != SH2_OK) {
-        printf("failed: sh2_open returned error code: %d\n", status);
+        printf("sh2_open failed, returned error code: %d\n", status);
         sleep_ms(1000);
         return false;
     }
@@ -307,6 +307,9 @@ bool bno085_hw_reset(void) {
     // release
     gpio_put(BNO085_RST_PIN, 1);
     sleep_ms(200);
+
+    // stop sh2, will re-init in main later
+    sh2_close();
 
     // need to re-init
     if (bno085_init()){
