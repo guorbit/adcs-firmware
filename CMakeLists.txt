@@ -22,6 +22,7 @@ set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
+# ====================================================================================
 
 add_compile_options(-Dtimegm=mktime)
 
@@ -34,6 +35,7 @@ project(ADCS_git C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
+add_definitions(-DPICO_I2C_DEFAULT_TIMEOUT_US=1000000)
 
 # Add GPS module - PUT IT HERE (after pico_sdk_init)
 set(MINNMEA_PATH "${CMAKE_CURRENT_LIST_DIR}/lib")
@@ -43,9 +45,10 @@ include(minnmea.cmake)
 
 add_executable(ADCS_git
     src/main.c
-    src/GPS.cpp
+    src/GPS.c
     src/bmp280.c
     src/bno085.c
+    src/i2c_utils.c
     src/obc.c
     lib/minmea.c
     lib/sh2_SensorValue.c
@@ -58,25 +61,28 @@ pico_set_program_name(ADCS_git "ADCS_git")
 pico_set_program_version(ADCS_git "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(ADCS_git 1)
+pico_enable_stdio_uart(ADCS_git 0)
 pico_enable_stdio_usb(ADCS_git 1)
 
-# Add the standard library to the build
-target_link_libraries(ADCS_git
-        pico_stdlib)
+# Specify uart0 pins 16 and 17 as default
+TARGET_COMPILE_DEFINITIONS(ADCS_git PRIVATE 
+    PICO_DEFAULT_UART_TX_PIN=16
+    PICO_DEFAULT_UART_RX_PIN=17)
+
+
+# Add any user requested libraries
+target_link_libraries(ADCS_git 
+        pico_stdlib
+        hardware_i2c
+        pico_i2c_slave
+        hardware_uart
+        hardware_irq
+        )
 
 # Add the standard include files to the build
 target_include_directories(ADCS_git PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
         ${CMAKE_CURRENT_LIST_DIR}/lib
 )
-
-# Add any user requested libraries
-target_link_libraries(ADCS_git 
-        hardware_i2c
-        pico_i2c_slave
-        hardware_uart
-        hardware_irq
-        )
 
 pico_add_extra_outputs(ADCS_git)

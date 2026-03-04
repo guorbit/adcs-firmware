@@ -2,9 +2,9 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
-#include "pico/i2c_slave.h"
 #include "pico/binary_info.h"
-#include "bno085.h"
+#include "i2c_utils.h"
+#include "hardware/gpio.h"
 
 // sh2 libraries https://github.com/ceva-dsp/sh2
 // based on this library https://github.com/robotcopper/BNO08x_Pico_Library, i took out a lot of stuff though
@@ -12,8 +12,7 @@
 #include "sh2_SensorValue.h"
 #include "sh2_err.h"
 #include "sh2_hal.h"
-
-// hello
+#include "bno085.h"
 
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
@@ -47,7 +46,25 @@ int sh2chal_open(sh2_Hal_t *self) {
     // initialise bool as false
     bool success = false;
 
-    // attempt to reset sensor
+    // ensure I2C pins are using I2C function and pulled up
+    gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(BNO085_SDA_PIN);
+    gpio_pull_up(BNO085_SCL_PIN);
+
+    // if we have a hardware reset pin, pulse it to ensure sensor is in a known state
+    if (BNO085_RST_PIN >= 0) {
+        gpio_init(BNO085_RST_PIN);
+        gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
+        // drive low to reset
+        gpio_put(BNO085_RST_PIN, 0);
+        sleep_ms(10);
+        // release
+        gpio_put(BNO085_RST_PIN, 1);
+        sleep_ms(50);
+    }
+
+    // attempt to reset sensor, this is the main point of this function
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
         printf("attempt %d: sending reset...\n", attempts+1);
         sleep_ms(10);
@@ -60,12 +77,14 @@ int sh2chal_open(sh2_Hal_t *self) {
             break;
             }
             else{
-                printf("i2c write failed. result code: %d \n", result);
+                printf("i2c_write_timeout_us failed. error code: %d \n", result);
             }
         sleep_ms(30);
     }
-    if (!success) {// <- if success = false
-        printf("could not reset bno085\n");
+
+    if (!success) {
+        printf("sh2chal_open failed, resetting i2c bus\n");
+        i2c_bus_reset(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
         return -1;
     }
 
@@ -82,7 +101,7 @@ int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     write = i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
     
     if (write != (int)len) {
-        printf("debug: i2c write failed. requested length: %d, error code: %d \n", len, write);
+        printf("i2c write failed. requested length: %d, error code: %d \n", len, write);
         return 0;
     }
     return len;
@@ -152,9 +171,9 @@ bool bno085_init(void) {
     uint8_t dummy;
     int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
-        printf("failed: i2c read error. error code: %d\n", res);
-        sleep_ms(1000);
-        return false;
+       printf("failed: bno085 didn't ack. error code : %d\n", res);
+       sleep_ms(100);
+       return false; // return to main.c
     }
 
     printf("success: device acknowledged\n");
@@ -169,7 +188,7 @@ bool bno085_init(void) {
     // open sh2, sh2_open is from the ceva sh2 api (sh2.c)
     int status = sh2_open(&HAL, sh2_async_event_handler, NULL);
     if (status != SH2_OK) {
-        printf("failed: sh2_open returned error code: %d\n", status);
+        printf("sh2_open failed, returned error code: %d\n", status);
         sleep_ms(1000);
         return false;
     }
@@ -211,6 +230,8 @@ bool bno085_get_report(bno085_state_t *out) {
         return false;
     }
 
+    // uint8_t status; /**< @brief bits 7-5: reserved, 4-2: exponent delay, 1-0: Accuracy */, so use a mask for just accuracy
+    internal_state.status[1] =  (sensor_value->status & 0x03);
     bno085_has_new = false; // reset flag
     switch (sensor_value->sensorId) {
         case SH2_ACCELEROMETER:
@@ -225,6 +246,12 @@ bool bno085_get_report(bno085_state_t *out) {
             internal_state.mag[2] = sensor_value->un.magneticField.z;
             return false;
 
+        case SH2_MAGNETIC_FIELD_UNCALIBRATED:
+        internal_state.mag[0] = sensor_value->un.magneticFieldUncal.x;
+        internal_state.mag[1] = sensor_value->un.magneticFieldUncal.y;
+        internal_state.mag[2] = sensor_value->un.magneticFieldUncal.z;
+        return false;
+
         case SH2_ROTATION_VECTOR:
             internal_state.quat[0] = sensor_value->un.rotationVector.real;
             internal_state.quat[1] = sensor_value->un.rotationVector.i;
@@ -234,7 +261,7 @@ bool bno085_get_report(bno085_state_t *out) {
             // Copy the whole state to the output
             *out = internal_state;
             return true; // Return true to trigger a print in main
-    }
+}
     return false;
 }
 
@@ -243,3 +270,53 @@ void bno085_poll(void) {
     sh2_service();
 }
 
+// reset stuff, trying to keep it in one place
+void bno085_reset(void) {
+    // handles the reset_occured flag, re-inits the reports
+    printf("sensor reset detected, re-enabling reports (bno085_reset)");
+
+    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
+        while(1){
+            printf("could not enable rotation vector\n");
+            sleep_ms(1000);
+        }
+    }
+    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
+        while(1){
+            printf("could not enable accelerometer\n");
+            sleep_ms(1000);
+        }
+    }
+    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
+        while(1){
+            printf("could not enable magnetometer\n");
+            sleep_ms(1000);
+        }
+    }
+
+    // reset the flag
+    reset_occurred = false;
+}
+
+bool bno085_hw_reset(void) {
+    gpio_init(BNO085_RST_PIN);
+    gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
+    // drive low to reset
+    gpio_put(BNO085_RST_PIN, 0);
+    sleep_ms(20);
+    // release
+    gpio_put(BNO085_RST_PIN, 1);
+    sleep_ms(200);
+
+    // stop sh2, will re-init in main later
+    sh2_close();
+
+    // need to re-init
+    if (bno085_init()){
+        return true;
+    } else {
+        printf("bno085_hw_reset failed to re-initialise\n");
+        return false;
+    }
+    sleep_ms(2000);
+}
