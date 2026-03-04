@@ -27,7 +27,7 @@ void setup_uart() {
 int main(void) {
     // Initialize UART for debugging output
     stdio_init_all();
-    setup_uart();
+    setup_uart(); // for gps
 
     sleep_ms(10000);   // allow usb to enumerate
     printf("\nsystem boot\n");
@@ -50,66 +50,18 @@ int main(void) {
     gpio_pull_up(BNO085_SCL_PIN);
     
     printf("I2C initialized on pins SDA=%d, SCL=%d\n", PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN);
-    
-    // Test I2C communication - try to read from BMP280
-    uint8_t test_buf[1];
-    int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
-    printf("I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
-    
-    if (ret < 0) {
-        printf("Trying alternate address 0x77...\n");
-        ret = i2c_read_blocking(i2c_default, 0x77, test_buf, 1, false);
-        printf("I2C read test (addr 0x77): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
-    }
-    
-    // Reset the BMP280
-    bmp280_reset();
-    sleep_ms(1000);  //wait after reset
-    printf("bmp280 reset\n");
-    
-    // Initialize the BMP280
-    bmp280_init();
-    sleep_ms(1000);  //wait after init
-    printf("bmp280 initialised\n");
-    
-    // Read calibration parameters
-    struct bmp280_calib_param calib_params;
-    bmp280_get_calib_params(&calib_params);
-    // print struct for debug/info
-    printf("Calibration parameters loaded\n");
-    printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
-    printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
-    
-    // main loop
-    while (1) {
-        int32_t raw_temp, raw_pressure;
-        bmp280_read_raw(&raw_temp, &raw_pressure);
-        
-        int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
-        uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
-        
-        float temperature = temp_c / 100.0f;
-        
-        printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
-        
-        sleep_ms(1000);
 
     // print devices visible on the bus
     i2c_bus_scan(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
 
+    // bno085 initialisation
     printf("Starting BNO085\n");
-
-    // sensor initialisation   
     while(!bno085_init()) {
         printf("retry bno085 init\n");
         i2c_bus_reset(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
         sh2_devReset();
         sleep_ms(1000);
     }
-
-    // force reset the sensor for advert packet
-    // sh2_devReset();
-    // sleep_ms(200);
 
     for (int i = 0; i < 200; i++) {
         // printf("int pin state: %d \n", gpio_get(BNO085_INT_PIN));
@@ -141,14 +93,55 @@ int main(void) {
 
     printf("BNO085 ready v6\n");
     sleep_ms(100);
-
+    
+    // bmp280 initialisation
+    // test i2c communication - try to read from bmp280
+    uint8_t test_buf[1];
+    int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
+    printf("I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    
+    if (ret < 0) {
+        printf("Trying alternate address 0x77...\n");
+        ret = i2c_read_blocking(i2c_default, 0x77, test_buf, 1, false);
+        printf("I2C read test (addr 0x77): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    }
+    
+    // Reset the BMP280
+    bmp280_reset();
+    sleep_ms(1000);  //wait after reset
+    printf("bmp280 reset\n");
+    
+    // Initialize the BMP280
+    bmp280_init();
+    sleep_ms(1000);  //wait after init
+    printf("bmp280 initialised\n");
+    
+    // Read calibration parameters
+    struct bmp280_calib_param calib_params;
+    bmp280_get_calib_params(&calib_params);
+    // print struct for debug/info
+    printf("Calibration parameters loaded\n");
+    printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
+    printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
+    
+    // init stuff that will be used in while loop
     bno085_state_t state;
-    uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // For the watchdog
-    uint32_t last_data_print = 0; // For printing
+    uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
+    uint32_t last_data_print = 0; // for printing
     static float last_qx, last_qy, last_qz;
     static int stale_count = 0;
     // main loop
     while (1) {
+        int32_t raw_temp, raw_pressure;
+        bmp280_read_raw(&raw_temp, &raw_pressure);
+        
+        int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
+        uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
+        
+        float temperature = temp_c / 100.0f;
+        
+        printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
+        
         bno085_poll();
 
         // timer for print and watchdog
