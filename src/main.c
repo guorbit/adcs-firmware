@@ -28,7 +28,6 @@ int main(void) {
     // Initialize UART for debugging output
     stdio_init_all();
     setup_uart(); // for gps
-
     sleep_ms(10000);   // allow usb to enumerate
     printf("\nsystem boot\n");
 
@@ -50,7 +49,6 @@ int main(void) {
     gpio_pull_up(BNO085_SCL_PIN);
     
     printf("I2C initialized on pins SDA=%d, SCL=%d\n", PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN);
-
     // print devices visible on the bus
     i2c_bus_scan(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
 
@@ -68,8 +66,6 @@ int main(void) {
         bno085_poll();  // poll sensor for advert packet
         sleep_ms(100);
     }
-
-    printf("sensor ready.\n");
 
     // enable different reports, at 100 hz
     if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
@@ -98,7 +94,7 @@ int main(void) {
     // test i2c communication - try to read from bmp280
     uint8_t test_buf[1];
     int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
-    printf("I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    printf("bmp280 I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
     
     if (ret < 0) {
         printf("Trying alternate address 0x77...\n");
@@ -130,28 +126,28 @@ int main(void) {
     uint32_t last_data_print = 0; // for printing
     static float last_qx, last_qy, last_qz;
     static int stale_count = 0;
+    int32_t raw_temp, raw_pressure;
+
     // main loop
     while (1) {
-        int32_t raw_temp, raw_pressure;
         bmp280_read_raw(&raw_temp, &raw_pressure);
         
         int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
         uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
-        
         float temperature = temp_c / 100.0f;
         
-        printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
+        // printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
         
         bno085_poll();
-
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
-
         float qw, qx, qy, qz;
+
         if (bno085_get_report(&state)) {
             // reset watchdog
             last_sensor_read = now;
-
+            
+            // soft reset, for stale data
             if (state.status == 0){
                 if (++stale_count > 100) {
                     printf("data unreliable for 1s, running sh2_devReset\n");
@@ -167,8 +163,8 @@ int main(void) {
             // print data, rate limited atm
             if (now - last_data_print > 1000) {
 
-                printf("status: %d | acc: %.2f %.2f %.2f | quat: %.2f %.2f %.2f %.2f | mag: %.1f %.1f %.1f\n",
-                    state.status[0],
+                printf("temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n",
+                    temperature, pressure_pa, state.status[0],
                     state.accel[0], state.accel[1], state.accel[2],
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
                     state.mag[0],   state.mag[1],   state.mag[2]);
@@ -178,14 +174,14 @@ int main(void) {
         }
 
         // reset stuffs
-        if (now - last_sensor_read > 5000) {
+        if (now - last_sensor_read > 50000) {
             printf("watchdog timeout, resetting hardware\n");
             if (bno085_hw_reset()) {
                 // reset timer so we don't meet if statement condition immediately and get stuck
-                last_sensor_read = now;
+                last_sensor_read = to_ms_since_boot(get_absolute_time());
             } else {
                 printf("bno085_hw_reset failed, starting next loop\n");
-                last_sensor_read = now;
+                last_sensor_read = to_ms_since_boot(get_absolute_time());
                 continue;
             }
         } else if (reset_occurred) {
