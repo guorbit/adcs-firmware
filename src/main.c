@@ -163,7 +163,7 @@ int main(void) {
             // print data, rate limited atm
             if (now - last_data_print > 1000) {
 
-                printf("temp: %.3f | pressure: %lu | bno085 status: %d | acc: %.2f %.2f %.2f | quat: %.2f %.2f %.2f %.2f | mag: %.1f %.1f %.1f\n",
+                printf("temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n",
                     temperature, pressure_pa, state.status[0],
                     state.accel[0], state.accel[1], state.accel[2],
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
@@ -174,14 +174,14 @@ int main(void) {
         }
 
         // reset stuffs
-        if (now - last_sensor_read > 5000) {
+        if (now - last_sensor_read > 50000) {
             printf("watchdog timeout, resetting hardware\n");
             if (bno085_hw_reset()) {
                 // reset timer so we don't meet if statement condition immediately and get stuck
-                last_sensor_read = now;
+                last_sensor_read = to_ms_since_boot(get_absolute_time());
             } else {
                 printf("bno085_hw_reset failed, starting next loop\n");
-                last_sensor_read = now;
+                last_sensor_read = to_ms_since_boot(get_absolute_time());
                 continue;
             }
         } else if (reset_occurred) {
