@@ -5,6 +5,7 @@
 #include "i2c_utils.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include <string.h>
 
 
 #include "bmp280.h"
@@ -34,6 +35,10 @@ int main(void) {
 
     adcs_slave_init();
     printf("adcs initialised as slave\n");
+
+    while(true){
+        tight_loop_contents();
+    }
 
     // reset the sensor by driving the reset pin low for 20ms, then releasing
     gpio_init(BNO085_RST_PIN);
@@ -173,8 +178,9 @@ int main(void) {
                 last_data_print = now;
 
                 printf("length of buffer: %d\n", obc_msg_len); // currently 103
+                printf(obc_telem);
 
-                adcs_telemetry((const uint8_t *)obc_telem, obc_msg_len);
+                adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
             }
         }
 

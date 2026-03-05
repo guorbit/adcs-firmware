@@ -20,7 +20,7 @@ static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
             if (tx_idx >= tx_len) {
                 tx_idx = 0;
             }
-            i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 1); // write raw for slave
+            i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 32); // write raw for slave
             tx_idx++;
             break;
 
@@ -36,7 +36,7 @@ static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
 void adcs_telemetry(const uint8_t *data, size_t len){
     // so stuffs isn't too long
     if (len > TX_BUF_SIZE) len = TX_BUF_SIZE; 
-    // fills with 0s i think
+    // fills with 0s
     memset((void *)tx_buf, 0, TX_BUF_SIZE);
     // copy to tx_buf from data
     memcpy((void *)tx_buf, data, len);
@@ -56,6 +56,7 @@ void adcs_slave_init(void)
     gpio_pull_up(ADCS_SDA);
     gpio_pull_up(ADCS_SCL);
 
-    i2c_slave_init(ADCS_PORT, ADCS_ADDR, adcs_slave_handler);
+    const char *msg = "ADCS test data 1234567890ABCDEFG"; // 32 bytes
+    adcs_telemetry((const uint8_t *)msg, strlen(msg));
 }
 
