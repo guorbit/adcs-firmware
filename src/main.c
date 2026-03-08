@@ -36,10 +36,6 @@ int main(void) {
     adcs_slave_init();
     printf("adcs initialised as slave\n");
 
-    while(true){
-        tight_loop_contents();
-    }
-
     // reset the sensor by driving the reset pin low for 20ms, then releasing
     gpio_init(BNO085_RST_PIN);
     gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
