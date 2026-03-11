@@ -13,15 +13,17 @@
 #define BNO085_SDA_PIN    8
 #define BNO085_SCL_PIN    9
 #define BNO085_INT_PIN    6   // set to -1 if not used
-#define BNO085_RST_PIN    5   // currently connected by jumper cable...
+#define BNO085_RST_PIN    5   // currently connected by enamel wire
 #define I2C_BUFFER_MAX    512 // 512 bytes max for buffer
-#define I2C_TIMEOUT_US    200000 // 100000 μs = 0.1s, exceeding results in pico timeout error
+#define I2C_TIMEOUT_US    100000 // 100000 μs = 0.1s, exceeding results in pico timeout error
 
 extern volatile bool reset_occurred;
+
 typedef struct {
     float accel[3];
     float quat[4];
     float mag[3];
+    int8_t status[1];
 } bno085_state_t;
 
 // sh2 hal
@@ -40,5 +42,9 @@ bool bno085_init(void);
 bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us);
 bool bno085_get_report(bno085_state_t *out);
 void bno085_poll(void);
+
+// reset stuff
+void bno085_reset(void);
+bool bno085_hw_reset(void);
 
 #endif

@@ -5,7 +5,6 @@
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
 #include "obc.h"
-// #include "hardware/i2c_slave.h" <- wrong version or something
 #include "pico/i2c_slave.h"
 
 // needs to allocate permanent memory, volatile so compiler doesn't assume things

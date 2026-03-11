@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
-#include "pico/i2c_slave.h"
 #include "bmp280.h"
 #include "pico/binary_info.h"
 
