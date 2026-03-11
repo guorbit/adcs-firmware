@@ -118,7 +118,9 @@ int main(void) {
             gps_get_sentence(line);
             // copy data from gps_data into gps
             gps_data_t gps = gps_data();
-            printf("UTC: %02d:%02d:%02d | Lat: %d, Lon: %d, Alt: %.2fm, Fix: %d\n", 
+            // lat and lon currently to 5dp, lmk if it should be more accurate
+            // -180.28881
+            printf("UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d\n", 
             gps.hour, gps.min, gps.sec, gps.lat, gps.lon, gps.alt, gps.fix_quality);
         } 
         sleep_ms(1);
