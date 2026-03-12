@@ -7,11 +7,13 @@
 #include "i2c_utils.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include <string.h>
 #include "pico/binary_info.h"
 
 #include "gtu7.h"
 #include "bmp280.h"
 #include "bno085.h"
+#include "obc.h"
 
 
 // init stuff that will be used in while loop
@@ -21,6 +23,9 @@ int main(void) {
     stdio_init_all();
     sleep_ms(10000);   // allow usb to enumerate
     printf("\nsystem boot\n");
+
+    adcs_slave_init();
+    printf("adcs initialised as slave\n");
 
     // reset the sensor by driving the reset pin low for 20ms, then releasing
     gpio_init(BNO085_RST_PIN);
@@ -59,23 +64,17 @@ int main(void) {
     }
 
     // enable different reports, at 100 hz
-    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
-        while(1){
-            printf("could not enable rotation vector\n");
-            sleep_ms(1000);
-        }
+    while(!enable_report(SH2_ROTATION_VECTOR, 10000)){
+        printf("could not enable rotation vector\n");
+        sleep_ms(50);
     }
-    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
-        while(1){
-            printf("could not enable accelerometer\n");
-            sleep_ms(1000);
-        }
+    while(!enable_report(SH2_ACCELEROMETER, 10000)){
+        printf("could not enable accelerometer\n");
+        sleep_ms(50);
     }
-    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
-        while(1){
-            printf("could not enable magnetometer\n");
-            sleep_ms(1000);
-        }
+    while(!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)){
+        printf("could not enable magnetometer\n");
+        sleep_ms(1000);
     }
 
     printf("BNO085 ready v6\n");
@@ -124,6 +123,7 @@ int main(void) {
     static float last_qx, last_qy, last_qz;
     static int stale_count = 0;
     int32_t raw_temp, raw_pressure;
+    char obc_telem [256]; // internal buffer
     gps_data_t gps; // struct to store incoming gps data
 
     // main loop
@@ -164,21 +164,24 @@ int main(void) {
                 // reset flag, otherwise it's pretty easy to get stale_count == 0 and trigger a reset
                 stale_count = 0; 
             }
-        }
+            
+            // print data, rate limited atm
+            if (now - last_data_print > 1000) {
 
-        // print data, rate limited atm
-        if (now - last_data_print > 1000) {
-            printf("nmea sentence: %s\n", nmea_raw);
-            // lat and lon currently to 5dp, lmk if it should be more accurate
-            printf("UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n",
-                gps.hour, gps.min, gps.sec, 
-                gps.lat, gps.lon, gps.alt, gps.fix_quality,
-                temperature, pressure_pa, state.status[0],
-                state.accel[0], state.accel[1], state.accel[2],
-                state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
-                state.mag[0],   state.mag[1],   state.mag[2]);
+                // temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n"
+                // snprintf uses the 
+                uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%07.2f|b%lu|i%d|a%+07.2f %+07.2f %+07.2f|q%+07.2f %+07.2f %+07.2f %+07.2f|m%+07.2f %+07.2f %+07.2f\n",
+                    temperature, pressure_pa, state.status[0],
+                    state.accel[0], state.accel[1], state.accel[2],
+                    state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
+                    state.mag[0],   state.mag[1],   state.mag[2]);
 
-            last_data_print = now;
+                last_data_print = now;
+
+                printf("length of buffer: %d\n", obc_msg_len); // currently 103
+                printf(obc_telem);
+
+                adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
             }
         }
 

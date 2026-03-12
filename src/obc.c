@@ -13,14 +13,14 @@ static volatile uint8_t tx_len = 0;
 static volatile uint8_t tx_idx = 0;
 static volatile bool tx_done = false;
 
-// slave handler for pico, as a slave to the OBC
+// slave handler for pico, as a slave to the OBC, called when i2c_slave_init is called
 static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
     switch (event) {
         case I2C_SLAVE_REQUEST: // when obc requests data from adcs, from pico sdk
             if (tx_idx >= tx_len) {
                 tx_idx = 0;
             }
-            i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 1); // write raw for slave
+            i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 32); // write raw for slave
             tx_idx++;
             break;
 
@@ -35,8 +35,10 @@ static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
 
 void adcs_telemetry(const uint8_t *data, size_t len){
     // so stuffs isn't too long
-    if (len > TX_BUF_SIZE) len = TX_BUF_SIZE;
+    if (len > TX_BUF_SIZE) len = TX_BUF_SIZE; 
+    // fills with 0s
     memset((void *)tx_buf, 0, TX_BUF_SIZE);
+    // copy to tx_buf from data
     memcpy((void *)tx_buf, data, len);
     tx_len = len;
 }
@@ -51,8 +53,6 @@ void adcs_slave_init(void)
     // sets the function of the GPIO pins (from general to i2c)
     gpio_set_function(ADCS_SDA, GPIO_FUNC_I2C);
     gpio_set_function(ADCS_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(ADCS_SDA);
-    gpio_pull_up(ADCS_SCL);
 
     i2c_slave_init(ADCS_PORT, ADCS_ADDR, adcs_slave_handler);
 
