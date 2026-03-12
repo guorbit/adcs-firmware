@@ -40,7 +40,7 @@ bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
     return uart_status;
 }
 
-bool read_uart(char *line, int max_length){
+bool read_gtu7_uart(char *line, int max_length){
     static uint16_t index = 0;
 
     if (uart_is_readable(GTU7_UART)){
