@@ -1,35 +1,26 @@
 #include <stdio.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
+
 #include "hardware/i2c.h"
 #include "sh2.h"
 #include "i2c_utils.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
 #include <string.h>
+#include "pico/binary_info.h"
 
-
+#include "gtu7.h"
 #include "bmp280.h"
 #include "bno085.h"
 #include "obc.h"
 
-#define GTU7_BAUD 9600
-#define GTU7_RX   16 // Pico TX (Connect to GPS RX)
-#define GTU7_TX   17 // Pico RX (Connect to GPS TX)
-#define GTU7_UART uart0
 
-void setup_uart() {
-    // Initialize UART at the specified baud rate
-    uart_init(GTU7_UART, GTU7_BAUD);
-
-    // Set the GPIO pin mux to the UART function
-    gpio_set_function(GTU7_TX, GPIO_FUNC_UART);
-    gpio_set_function(GTU7_RX, GPIO_FUNC_UART);
-}
+// init stuff that will be used in while loop
+char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 
 int main(void) {
-    // Initialize UART for debugging output
     stdio_init_all();
-    setup_uart(); // for gps
     sleep_ms(10000);   // allow usb to enumerate
     printf("\nsystem boot\n");
 
@@ -119,7 +110,13 @@ int main(void) {
     printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
     printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
     
-    // init stuff that will be used in while loop
+    // gps initialisation
+    while(!gps_init(GTU7_UART, GTU7_TX, GTU7_RX, GTU7_BAUD)){
+        sleep_ms(1000);
+        printf("gtu7 init failed, retrying\n");
+    }
+    printf("gtu7 initialised\n");
+
     bno085_state_t state;
     uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
     uint32_t last_data_print = 0; // for printing
@@ -127,27 +124,35 @@ int main(void) {
     static int stale_count = 0;
     int32_t raw_temp, raw_pressure;
     char obc_telem [256]; // internal buffer
+    gps_data_t gps; // struct to store incoming gps data
 
     // main loop
     while (1) {
+        // polling bmp280
         bmp280_read_raw(&raw_temp, &raw_pressure);
         
+        // conversions needed for bmp280
         int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
         uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
         float temperature = temp_c / 100.0f;
-        
-        // printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
-        
+
         bno085_poll();
+
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
         float qw, qx, qy, qz;
 
-        if (bno085_get_report(&state)) {
-            // reset watchdog
+        // polling gtu7
+        while(!read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH)){
+            // translate gps data
+            gps_get_sentence(nmea_raw);
+            // copy data from gps_data into gps
+            gps = gps_data(); // updating persistent variable
+        }
+
+        // polling bno085
+        if(bno085_get_report(&state)){
             last_sensor_read = now;
-            
-            // soft reset, for stale data
             if (state.status == 0){
                 if (++stale_count > 100) {
                     printf("data unreliable for 1s, running sh2_devReset\n");
