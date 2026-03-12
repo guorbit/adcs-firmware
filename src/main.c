@@ -13,6 +13,10 @@
 #include "bmp280.h"
 #include "bno085.h"
 
+
+// init stuff that will be used in while loop
+char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
+
 int main(void) {
     stdio_init_all();
     sleep_ms(10000);   // allow usb to enumerate
@@ -114,7 +118,6 @@ int main(void) {
     }
     printf("gtu7 initialised\n");
 
-    // init stuff that will be used in while loop
     bno085_state_t state;
     uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
     uint32_t last_data_print = 0; // for printing
@@ -122,7 +125,6 @@ int main(void) {
     static int stale_count = 0;
     int32_t raw_temp, raw_pressure;
     gps_data_t gps; // struct to store incoming gps data
-    char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 
     // main loop
     while (1) {
@@ -141,7 +143,7 @@ int main(void) {
         float qw, qx, qy, qz;
 
         // polling gtu7
-        if(read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH) == true){
+        while(!read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH)){
             // translate gps data
             gps_get_sentence(nmea_raw);
             // copy data from gps_data into gps
@@ -177,6 +179,7 @@ int main(void) {
                 state.mag[0],   state.mag[1],   state.mag[2]);
 
             last_data_print = now;
+            }
         }
 
         // reset stuffs
