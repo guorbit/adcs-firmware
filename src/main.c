@@ -13,8 +13,6 @@
 #include "bmp280.h"
 #include "bno085.h"
 
-char line[MINMEA_MAX_SENTENCE_LENGTH];
-
 int main(void) {
     stdio_init_all();
     sleep_ms(10000);   // allow usb to enumerate
@@ -124,6 +122,7 @@ int main(void) {
     static int stale_count = 0;
     int32_t raw_temp, raw_pressure;
     gps_data_t gps; // struct to store incoming gps data
+    char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 
     // main loop
     while (1) {
@@ -142,12 +141,11 @@ int main(void) {
         float qw, qx, qy, qz;
 
         // polling gtu7
-        if(read_gtu7_uart(line, MINMEA_MAX_SENTENCE_LENGTH)){
-            printf("nmea sentence: %s\n", line);
+        if(read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH) == true){
             // translate gps data
-            gps_get_sentence(line);
+            gps_get_sentence(nmea_raw);
             // copy data from gps_data into gps
-            gps = gps_data(); // updating the persistent variable
+            gps = gps_data(); // updating persistent variable
         }
 
         // polling bno085
@@ -168,6 +166,7 @@ int main(void) {
 
         // print data, rate limited atm
         if (now - last_data_print > 1000) {
+            printf("nmea sentence: %s\n", nmea_raw);
             // lat and lon currently to 5dp, lmk if it should be more accurate
             printf("UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n",
                 gps.hour, gps.min, gps.sec, 

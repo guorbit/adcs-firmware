@@ -53,7 +53,7 @@ bool read_gtu7_uart(char *line, int max_length){
         } else if (get_char == '\n'){
             line[index] = '\0';
             index = 0;
-            return true;
+            return true; // should return true at the end of a sentence
         } else if (get_char != '\r' && index < max_length - 1){
             line[index++] = get_char;
         }
