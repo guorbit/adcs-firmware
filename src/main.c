@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "pico/stdlib.h"
+
 #include "hardware/i2c.h"
 #include "sh2.h"
 #include "i2c_utils.h"
@@ -9,28 +10,15 @@
 #include "pico/binary_info.h"
 
 #include "gtu7.h"
-
 #include "bmp280.h"
 #include "bno085.h"
 
-#define GTU7_BAUD 9600
-#define GTU7_RX   16 // Pico TX (Connect to GPS RX)
-#define GTU7_TX   17 // Pico RX (Connect to GPS TX)
-#define GTU7_UART uart0
 
-void setup_uart() {
-    // Initialize UART at the specified baud rate
-    uart_init(GTU7_UART, GTU7_BAUD);
-
-    // Set the GPIO pin mux to the UART function
-    gpio_set_function(GTU7_TX, GPIO_FUNC_UART);
-    gpio_set_function(GTU7_RX, GPIO_FUNC_UART);
-}
-char line[MINMEA_MAX_SENTENCE_LENGTH];
+// init stuff that will be used in while loop
+char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 
 int main(void) {
     stdio_init_all();
-    setup_uart(); // for gps
     sleep_ms(10000);   // allow usb to enumerate
     printf("\nsystem boot\n");
 
@@ -126,54 +114,45 @@ int main(void) {
     // gps initialisation
     while(!gps_init(GTU7_UART, GTU7_TX, GTU7_RX, GTU7_BAUD)){
         sleep_ms(1000);
-        printf("init failed, retrying...\n");
+        printf("gtu7 init failed, retrying\n");
     }
-    printf("init successful v2.1\n");
+    printf("gtu7 initialised\n");
 
-    
-    // getting data from gps
-    while(1){
-        if (read_uart(line, MINMEA_MAX_SENTENCE_LENGTH) == true) {
-            printf("nmea sentence: %s\n", line);
-            // translate gps data
-            gps_get_sentence(line);
-            // copy data from gps_data into gps
-            gps_data_t gps = gps_data();
-            // lat and lon currently to 5dp, lmk if it should be more accurate
-            // -180.28881
-            printf("UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d\n", 
-            gps.hour, gps.min, gps.sec, gps.lat, gps.lon, gps.alt, gps.fix_quality);
-        } 
-        sleep_ms(1);
-    }
-    // init stuff that will be used in while loop
     bno085_state_t state;
     uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
     uint32_t last_data_print = 0; // for printing
     static float last_qx, last_qy, last_qz;
     static int stale_count = 0;
     int32_t raw_temp, raw_pressure;
+    gps_data_t gps; // struct to store incoming gps data
 
     // main loop
     while (1) {
+        // polling bmp280
         bmp280_read_raw(&raw_temp, &raw_pressure);
         
+        // conversions needed for bmp280
         int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
         uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
         float temperature = temp_c / 100.0f;
-        
-        // printf("temp: %.3f pressure: %lu\n", temperature, pressure_pa);
-        
+
         bno085_poll();
+
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
         float qw, qx, qy, qz;
 
-        if (bno085_get_report(&state)) {
-            // reset watchdog
+        // polling gtu7
+        while(!read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH)){
+            // translate gps data
+            gps_get_sentence(nmea_raw);
+            // copy data from gps_data into gps
+            gps = gps_data(); // updating persistent variable
+        }
+
+        // polling bno085
+        if(bno085_get_report(&state)){
             last_sensor_read = now;
-            
-            // soft reset, for stale data
             if (state.status == 0){
                 if (++stale_count > 100) {
                     printf("data unreliable for 1s, running sh2_devReset\n");
@@ -185,17 +164,21 @@ int main(void) {
                 // reset flag, otherwise it's pretty easy to get stale_count == 0 and trigger a reset
                 stale_count = 0; 
             }
-            
-            // print data, rate limited atm
-            if (now - last_data_print > 1000) {
+        }
 
-                printf("temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n",
-                    temperature, pressure_pa, state.status[0],
-                    state.accel[0], state.accel[1], state.accel[2],
-                    state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
-                    state.mag[0],   state.mag[1],   state.mag[2]);
+        // print data, rate limited atm
+        if (now - last_data_print > 1000) {
+            printf("nmea sentence: %s\n", nmea_raw);
+            // lat and lon currently to 5dp, lmk if it should be more accurate
+            printf("UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n",
+                gps.hour, gps.min, gps.sec, 
+                gps.lat, gps.lon, gps.alt, gps.fix_quality,
+                temperature, pressure_pa, state.status[0],
+                state.accel[0], state.accel[1], state.accel[2],
+                state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
+                state.mag[0],   state.mag[1],   state.mag[2]);
 
-                last_data_print = now;
+            last_data_print = now;
             }
         }
 
