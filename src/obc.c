@@ -16,18 +16,29 @@ static volatile bool tx_done = false;
 // slave handler for pico, as a slave to the OBC, called when i2c_slave_init is called
 static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
     switch (event) {
-        case I2C_SLAVE_REQUEST: // when obc requests data from adcs, from pico sdk
-            if (tx_idx >= tx_len) {
+        case I2C_SLAVE_REQUEST: // when obc requests data from adcs
+            if (tx_idx < tx_len){
+                i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 1); // write raw for slave
+                tx_idx++;
+            } else {
+                uint8_t pad = '\0';
+                i2c_write_raw_blocking(i2c, &pad, 1);
+            }
+            
+            break;
+        case I2C_SLAVE_FINISH:
+            // only reset index after 141 bytes 
+            if (tx_idx >= tx_len){
                 tx_idx = 0;
             }
-            i2c_write_raw_blocking(i2c, (const uint8_t *)&tx_buf[tx_idx], 32); // write raw for slave
-            tx_idx++;
             break;
-
-        case I2C_SLAVE_FINISH:
+        case I2C_SLAVE_RECEIVE: {
+            // init buffer to accept data
+            uint8_t dummy;
+            i2c_read_raw_blocking(i2c, &dummy, 1);
             tx_idx = 0;
             break;
-
+        }
         default:
             break;
     }
@@ -55,8 +66,5 @@ void adcs_slave_init(void)
     gpio_set_function(ADCS_SCL, GPIO_FUNC_I2C);
 
     i2c_slave_init(ADCS_PORT, ADCS_ADDR, adcs_slave_handler);
-
-    const char *msg = "ADCS test data 1234567890ABCDEFG"; // 32 bytes
-    adcs_telemetry((const uint8_t *)msg, strlen(msg));
 }
 

@@ -168,18 +168,14 @@ int main(void) {
             // print data, rate limited atm
             if (now - last_data_print > 1000) {
                 // print checks, so that data sent to obc is always the same length
-                gps.lat = 0.0;
-                gps.lon = 0.1;
-                printf("lat: %f, lon: %f\n", gps.lat, gps.lon);
-                // if (gps.lon > 180.0 || gps.lon < -180.0 ) {
-                //     gps.lon = 0.0; // should pad itself
-                // }
-                // if (gps.lat > 90.0 || gps.lat < -90.0) {
-                //     gps.lat = 0.0; // should pad itself
-                // }
+                if (gps.fix_quality == 0) {
+                    gps.lat = 0.0;
+                    gps.lon = 0.0;
+                    gps.alt = 0.0;
+                }
+                // printf("lat: %f, lon: %f\n", gps.lat, gps.lon);
 
                 // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
-                // snprintf uses the 
                 uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d:%02d:%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
                     gps.hour, gps.min, gps.sec, 
                     gps.lat, gps.lon, gps.alt, gps.fix_quality,
