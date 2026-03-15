@@ -37,6 +37,7 @@ static void adcs_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
             uint8_t dummy;
             i2c_read_raw_blocking(i2c, &dummy, 1);
             tx_idx = 0;
+            printf("adcs out of sync, obc requested a reset of idx = 0\n");
             break;
         }
         default:
