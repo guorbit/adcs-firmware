@@ -16,6 +16,7 @@
 #include "bmp280.h"
 #include "bno085.h"
 #include "obc.h"
+#include "blink.h"
 
 
 // init stuff that will be used in while loop
@@ -59,6 +60,7 @@ int main(void) {
 
     // Initialize critical section
     critical_section_init(&gps_crit);
+    blink_init();
 
     // reset the sensor by driving the reset pin low for 20ms, then releasing
     gpio_init(BNO085_RST_PIN);
@@ -165,6 +167,7 @@ int main(void) {
 
     // main loop
     while (1) {
+        blink_polling();
         // polling bmp280
         bmp280_read_raw(&raw_temp, &raw_pressure);
         
@@ -220,6 +223,8 @@ int main(void) {
                     state.accel[0], state.accel[1], state.accel[2],
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
                     state.mag[0],   state.mag[1],   state.mag[2]);
+
+                printf("nmea sentence: %s\n", nmea_raw);
 
                 last_data_print = now;
 

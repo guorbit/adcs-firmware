@@ -67,5 +67,9 @@ void adcs_slave_init(void)
     gpio_set_function(ADCS_SCL, GPIO_FUNC_I2C);
 
     i2c_slave_init(ADCS_PORT, ADCS_ADDR, adcs_slave_handler);
+
+    // adcs not ready message
+    static char not_ready[32] = "adcs not ready.\0";
+    adcs_telemetry(not_ready, strlen(not_ready));
 }
 
