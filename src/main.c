@@ -14,6 +14,7 @@
 #include "bmp280.h"
 #include "bno085.h"
 #include "obc.h"
+#include "blink.h"
 
 
 // init stuff that will be used in while loop
@@ -26,6 +27,8 @@ int main(void) {
 
     adcs_slave_init();
     printf("adcs initialised as slave\n");
+
+    blink_init();
 
     // reset the sensor by driving the reset pin low for 20ms, then releasing
     gpio_init(BNO085_RST_PIN);
@@ -128,6 +131,7 @@ int main(void) {
 
     // main loop
     while (1) {
+        blink_polling();
         // polling bmp280
         bmp280_read_raw(&raw_temp, &raw_pressure);
         
@@ -167,16 +171,6 @@ int main(void) {
             
             // print data, rate limited atm
             if (now - last_data_print > 1000) {
-                // print checks, so that data sent to obc is always the same length
-                gps.lat = 0.0;
-                gps.lon = 0.1;
-                printf("lat: %f, lon: %f\n", gps.lat, gps.lon);
-                // if (gps.lon > 180.0 || gps.lon < -180.0 ) {
-                //     gps.lon = 0.0; // should pad itself
-                // }
-                // if (gps.lat > 90.0 || gps.lat < -90.0) {
-                //     gps.lat = 0.0; // should pad itself
-                // }
 
                 // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
                 uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d:%02d:%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
@@ -186,6 +180,8 @@ int main(void) {
                     state.accel[0], state.accel[1], state.accel[2],
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
                     state.mag[0],   state.mag[1],   state.mag[2]);
+
+                printf("nmea sentence: %s\n", nmea_raw);
 
                 last_data_print = now;
 
