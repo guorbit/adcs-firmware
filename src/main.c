@@ -18,16 +18,18 @@
 #include "obc.h"
 #include "blink.h"
 
+#define ADCS_DEBUG true
 
-// init stuff that will be used in while loop
-char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 
 // Shared resources
+char shared_nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 gps_data_t shared_gps;
 critical_section_t gps_crit;
 
 // Core1
 void main1(void) {
+    // init stuff that will be used in while loop
+    char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
     gps_data_t gps; // struct to store incoming gps data
     while(1) {
         // polling gtu7
@@ -42,6 +44,10 @@ void main1(void) {
 
         // Critical section to update shared_gps
         critical_section_enter_blocking(&gps_crit);
+        #if ADCS_DEBUG
+        strncpy(shared_nmea_raw, nmea_raw, sizeof(shared_nmea_raw) - 1);
+        shared_nmea_raw[sizeof(shared_nmea_raw) - 1] = '\0';
+        #endif
         shared_gps = gps;
         critical_section_exit(&gps_crit);
 
@@ -224,12 +230,16 @@ int main(void) {
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
                     state.mag[0],   state.mag[1],   state.mag[2]);
 
-                printf("nmea sentence: %s\n", nmea_raw);
-
                 last_data_print = now;
+
+                #if ADCS_DEBUG
+
+                printf(shared_nmea_raw);
 
                 printf("length of buffer: %d\n", obc_msg_len); // currently 141
                 printf(obc_telem);
+
+                #endif
 
                 adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
             }
