@@ -203,7 +203,7 @@ int main(void) {
             }
             
             // print data, rate limited atm
-            if (now - last_data_print > 1000) {
+            if (now - last_data_print > 100) {
                 // print checks, so that data sent to obc is always the same length
                 // gps.lat = 0.0;
                 // gps.lon = 0.1;
