@@ -77,6 +77,8 @@ target_link_libraries(ADCS_git
         pico_i2c_slave
         hardware_uart
         hardware_irq
+        pico_multicore
+        pico_sync
         )
 
 # Add the standard include files to the build

@@ -9,6 +9,8 @@
 #include "hardware/gpio.h"
 #include <string.h>
 #include "pico/binary_info.h"
+#include "pico/multicore.h"
+#include "pico/sync.h"
 
 #include "gtu7.h"
 #include "bmp280.h"
@@ -19,6 +21,34 @@
 // init stuff that will be used in while loop
 char nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
 
+// Shared resources
+gps_data_t shared_gps;
+critical_section_t gps_crit;
+
+// Core1
+void main1(void) {
+    gps_data_t gps; // struct to store incoming gps data
+    while(1) {
+        // polling gtu7
+        while(!read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH)){
+            // do nothing until all characters are fetched
+        }
+
+        // translate gps data
+        gps_get_sentence(nmea_raw);
+        // copy data from gps_data into gps
+        gps = gps_data(); // updating persistent variable
+
+        // Critical section to update shared_gps
+        critical_section_enter_blocking(&gps_crit);
+        shared_gps = gps;
+        critical_section_exit(&gps_crit);
+
+        sleep_ms(5);
+    }
+}
+
+// Core0
 int main(void) {
     stdio_init_all();
     sleep_ms(10000);   // allow usb to enumerate
@@ -26,6 +56,9 @@ int main(void) {
 
     adcs_slave_init();
     printf("adcs initialised as slave\n");
+
+    // Initialize critical section
+    critical_section_init(&gps_crit);
 
     // reset the sensor by driving the reset pin low for 20ms, then releasing
     gpio_init(BNO085_RST_PIN);
@@ -117,6 +150,10 @@ int main(void) {
     }
     printf("gtu7 initialised\n");
 
+    // Launch Core 1
+    multicore_launch_core1(main1);
+    printf("Core 1 launched for GPS handling\n");
+
     bno085_state_t state;
     uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
     uint32_t last_data_print = 0; // for printing
@@ -124,7 +161,7 @@ int main(void) {
     static int stale_count = 0;
     int32_t raw_temp, raw_pressure;
     char obc_telem [142]; // internal buffer can be bigger than obc buffer but i'll just set it exactly
-    gps_data_t gps; // struct to store incoming gps data
+    gps_data_t gps; // local gps struct for core0
 
     // main loop
     while (1) {
@@ -142,13 +179,10 @@ int main(void) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
         float qw, qx, qy, qz;
 
-        // polling gtu7
-        while(!read_gtu7_uart(nmea_raw, MINMEA_MAX_SENTENCE_LENGTH)){
-            // translate gps data
-            gps_get_sentence(nmea_raw);
-            // copy data from gps_data into gps
-            gps = gps_data(); // updating persistent variable
-        }
+        // Fetch GPS data from shared variable
+        critical_section_enter_blocking(&gps_crit);
+        gps = shared_gps;
+        critical_section_exit(&gps_crit);
 
         // polling bno085
         if(bno085_get_report(&state)){
@@ -168,9 +202,9 @@ int main(void) {
             // print data, rate limited atm
             if (now - last_data_print > 1000) {
                 // print checks, so that data sent to obc is always the same length
-                gps.lat = 0.0;
-                gps.lon = 0.1;
-                printf("lat: %f, lon: %f\n", gps.lat, gps.lon);
+                // gps.lat = 0.0;
+                // gps.lon = 0.1;
+                // printf("lat: %f, lon: %f\n", gps.lat, gps.lon);
                 // if (gps.lon > 180.0 || gps.lon < -180.0 ) {
                 //     gps.lon = 0.0; // should pad itself
                 // }
@@ -179,7 +213,7 @@ int main(void) {
                 // }
 
                 // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
-                uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d:%02d:%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
+                uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
                     gps.hour, gps.min, gps.sec, 
                     gps.lat, gps.lon, gps.alt, gps.fix_quality,
                     temperature, pressure_pa, state.status[0],

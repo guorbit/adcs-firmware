@@ -22,7 +22,7 @@ bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
     printf("baud rate: %d\n",return_baud);
     
     // prevent buffer from getting filled with junk
-    uart_set_fifo_enabled(uart, false);
+    //uart_set_fifo_enabled(uart, false);
 	// set the TX and RX pins
 	gpio_set_function(tx, UART_FUNCSEL_NUM(uart, tx));
 	gpio_set_function(rx, UART_FUNCSEL_NUM(uart, rx));
