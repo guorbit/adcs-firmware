@@ -48,6 +48,7 @@ add_executable(ADCS_git
     src/gtu7.c
     src/bmp280.c
     src/bno085.c
+    src/blink.c
     src/i2c_utils.c
     src/obc.c
     lib/minmea.c
@@ -77,6 +78,8 @@ target_link_libraries(ADCS_git
         pico_i2c_slave
         hardware_uart
         hardware_irq
+        pico_multicore
+        pico_sync
         )
 
 # Add the standard include files to the build
