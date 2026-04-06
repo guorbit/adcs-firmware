@@ -51,6 +51,7 @@ add_executable(ADCS_git
     src/blink.c
     src/i2c_utils.c
     src/obc.c
+    src/adcs_i2c.c
     lib/minmea.c
     lib/sh2_SensorValue.c
     lib/sh2_util.c

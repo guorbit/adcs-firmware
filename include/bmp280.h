@@ -6,10 +6,10 @@
 
 // device has default bus address of 0x76
 #define BMP280_ADDR      0x76
-#define BMP280_I2C       i2c0
+// #define BMP280_I2C       i2c0
 
-#define BMP280_SDA_PIN   8 // rpi pico gpio pins, same as bno085 bc on the same bus
-#define BMP280_SCL_PIN   9
+// #define BMP280_SDA_PIN   8 // rpi pico gpio pins, same as bno085 bc on the same bus
+// #define BMP280_SCL_PIN   9
 
 // hardware registers
 #define BMP280_REG_CONFIG _u(0xF5)

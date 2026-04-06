@@ -13,6 +13,7 @@
 #include "sh2_err.h"
 #include "sh2_hal.h"
 #include "bno085.h"
+#include "adcs_i2c.h"
 
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
@@ -47,10 +48,10 @@ int sh2chal_open(sh2_Hal_t *self) {
     bool success = false;
 
     // ensure I2C pins are using I2C function and pulled up
-    gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
-    gpio_pull_up(BNO085_SDA_PIN);
-    gpio_pull_up(BNO085_SCL_PIN);
+    gpio_set_function(ADCS_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(ADCS_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(ADCS_SDA_PIN);
+    gpio_pull_up(ADCS_SCL_PIN);
 
     // if we have a hardware reset pin, pulse it to ensure sensor is in a known state
     if (BNO085_RST_PIN >= 0) {
@@ -68,7 +69,7 @@ int sh2chal_open(sh2_Hal_t *self) {
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
         printf("attempt %d: sending reset...\n", attempts+1);
         sleep_ms(10);
-        int result = i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US);
+        int result = i2c_write_timeout_us(ADCS_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US);
         
         // if result is 5 bytes (softrest_pkt)
         if (result == 5) {
@@ -84,7 +85,7 @@ int sh2chal_open(sh2_Hal_t *self) {
 
     if (!success) {
         printf("sh2chal_open failed, resetting i2c bus\n");
-        i2c_bus_reset(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
+        i2c_bus_reset(ADCS_I2C, ADCS_SDA_PIN, ADCS_SCL_PIN);
         return -1;
     }
 
@@ -98,7 +99,7 @@ void sh2_hal_close(sh2_Hal_t *self) {
 
 int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     int write;
-    write = i2c_write_timeout_us(BNO085_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
+    write = i2c_write_timeout_us(ADCS_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
     
     if (write != (int)len) {
         printf("i2c write failed. requested length: %d, error code: %d \n", len, write);
@@ -118,7 +119,7 @@ int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *t
         return 0;
     }
 
-    return_value = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, i2c_buffer, len, false, I2C_TIMEOUT_US);
+    return_value = i2c_read_timeout_us(ADCS_I2C, BNO085_ADDR, i2c_buffer, len, false, I2C_TIMEOUT_US);
 
     if (return_value <= 0) {
         return 0;
@@ -169,14 +170,14 @@ uint32_t hal_getTimeUs(sh2_Hal_t *self)
 bool bno085_init(void) {
     // check device present, does bno ack ?
     uint8_t dummy;
-    int res = i2c_read_timeout_us(BNO085_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
+    int res = i2c_read_timeout_us(ADCS_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
        printf("failed: bno085 didn't ack. error code : %d\n", res);
        sleep_ms(100);
        return false; // return to main.c
     }
 
-    printf("success: device acknowledged\n");
+    // printf("success: bno085 acknowledged\n");
 
     // fill HAL struct
     HAL.open      = sh2chal_open;
@@ -197,7 +198,18 @@ bool bno085_init(void) {
     sh2_setSensorCallback(sh2_sensor_event_handler, NULL);
     reset_occurred = false;
 
-    printf("bno085 initialisation complete\n");
+    // fetch inital boot packet to clear sensor
+    for (int i = 0; i < 200; i++) {
+        // printf("int pin state: %d \n", gpio_get(BNO085_INT_PIN));
+        // check if pulled low, i.e. bno085 has ack/data
+        if (gpio_get(BNO085_INT_PIN) == 0){
+            bno085_poll(); // poll sensor for advert packet
+            break;
+        }  
+        sleep_ms(5);
+    }    
+
+    printf("bno085_init complete\n");
     return true;
 }
 
@@ -235,16 +247,16 @@ bool bno085_get_report(bno085_state_t *out) {
     bno085_has_new = false; // reset flag
     switch (sensor_value->sensorId) {
         case SH2_ACCELEROMETER:
-            internal_state.accel[0] = sensor_value->un.accelerometer.x;
-            internal_state.accel[1] = sensor_value->un.accelerometer.y;
-            internal_state.accel[2] = sensor_value->un.accelerometer.z;
-            return false; // Don't return yet, wait for orientation
+        internal_state.accel[0] = sensor_value->un.accelerometer.x;
+        internal_state.accel[1] = sensor_value->un.accelerometer.y;
+        internal_state.accel[2] = sensor_value->un.accelerometer.z;
+        return false; // Don't return yet, wait for orientation
 
         case SH2_MAGNETIC_FIELD_CALIBRATED:
-            internal_state.mag[0] = sensor_value->un.magneticField.x;
-            internal_state.mag[1] = sensor_value->un.magneticField.y;
-            internal_state.mag[2] = sensor_value->un.magneticField.z;
-            return false;
+        internal_state.mag[0] = sensor_value->un.magneticField.x;
+        internal_state.mag[1] = sensor_value->un.magneticField.y;
+        internal_state.mag[2] = sensor_value->un.magneticField.z;
+        return false;
 
         case SH2_MAGNETIC_FIELD_UNCALIBRATED:
         internal_state.mag[0] = sensor_value->un.magneticFieldUncal.x;
@@ -253,21 +265,37 @@ bool bno085_get_report(bno085_state_t *out) {
         return false;
 
         case SH2_ROTATION_VECTOR:
-            internal_state.quat[0] = sensor_value->un.rotationVector.real;
-            internal_state.quat[1] = sensor_value->un.rotationVector.i;
-            internal_state.quat[2] = sensor_value->un.rotationVector.j;
-            internal_state.quat[3] = sensor_value->un.rotationVector.k;
-            
-            // Copy the whole state to the output
-            *out = internal_state;
-            return true; // Return true to trigger a print in main
-}
+        internal_state.quat[0] = sensor_value->un.rotationVector.real;
+        internal_state.quat[1] = sensor_value->un.rotationVector.i;
+        internal_state.quat[2] = sensor_value->un.rotationVector.j;
+        internal_state.quat[3] = sensor_value->un.rotationVector.k;
+        
+        // Copy the whole state to the output
+        *out = internal_state;
+        return true; // Return true to trigger a print in main
+    }
     return false;
 }
 
 void bno085_poll(void) {
     // ask sh2 to process any pending transfers
     sh2_service();
+}
+
+// enable different reports, at 100 hz
+void bno085_enable_reports(void) {
+    bool rotation = enable_report(SH2_ROTATION_VECTOR, 10000);
+    bool accel = enable_report(SH2_ACCELEROMETER, 10000);
+    bool mag = enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000);
+
+    if (!rotation) printf("Failed: Rotation Vector\n");
+    if (!accel) printf("Failed: Accelerometer\n");
+    if (!mag) printf("Failed: Magnetometer\n");
+
+    if (!rotation || !accel || !mag) {
+        return false;
+    }
+    return true; 
 }
 
 // reset stuff, trying to keep it in one place

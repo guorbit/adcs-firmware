@@ -17,6 +17,7 @@
 #include "bno085.h"
 #include "obc.h"
 #include "blink.h"
+#include "adcs_i2c.h"
 
 #define ADCS_DEBUG true
 
@@ -79,47 +80,23 @@ int main(void) {
     sleep_ms(2000);
 
     // init i2c for bmp280 and bno085
-    i2c_init(BNO085_I2C, 100 * 1000);
-    gpio_set_function(BNO085_SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(BNO085_SCL_PIN, GPIO_FUNC_I2C);
-    gpio_pull_up(BNO085_SDA_PIN);
-    gpio_pull_up(BNO085_SCL_PIN);
+    adcs_i2c_init();
     
     printf("I2C initialized on pins SDA=%d, SCL=%d\n", PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN);
     // print devices visible on the bus
-    i2c_bus_scan(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
+    i2c_bus_scan(ADCS_I2C, ADCS_SDA_PIN, ADCS_SCL_PIN);
 
     // bno085 initialisation
     printf("Starting BNO085\n");
     while(!bno085_init()) {
-        printf("retry bno085 init\n");
-        i2c_bus_reset(BNO085_I2C, BNO085_SDA_PIN, BNO085_SCL_PIN);
+        printf("retry bno085_init\n");
+        i2c_bus_reset(ADCS_I2C, ADCS_SDA_PIN, ADCS_SCL_PIN);
         sh2_devReset();
         sleep_ms(1000);
     }
-
-    for (int i = 0; i < 200; i++) {
-        // printf("int pin state: %d \n", gpio_get(BNO085_INT_PIN));
-        bno085_poll();  // poll sensor for advert packet
-        sleep_ms(100);
-    }
-
-    // enable different reports, at 100 hz
-    while(!enable_report(SH2_ROTATION_VECTOR, 10000)){
-        printf("could not enable rotation vector\n");
-        sleep_ms(50);
-    }
-    while(!enable_report(SH2_ACCELEROMETER, 10000)){
-        printf("could not enable accelerometer\n");
-        sleep_ms(50);
-    }
-    while(!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)){
-        printf("could not enable magnetometer\n");
-        sleep_ms(1000);
-    }
-
+    bno085_enable_reports();
     printf("BNO085 ready v6\n");
-    sleep_ms(100);
+    sleep_ms(10);
     
     // bmp280 initialisation
     // test i2c communication - try to read from bmp280
