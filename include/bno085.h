@@ -40,7 +40,7 @@ bool bno085_init(void);
 bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us);
 bool bno085_get_report(bno085_state_t *out);
 void bno085_poll(void);
-void bno085_enable_reports(void);
+bool bno085_enable_reports(void);
 
 // reset stuff
 void bno085_reset(void);

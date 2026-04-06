@@ -53,7 +53,7 @@
 // number of calibration registers to be read
 #define BMP280_NUM_CALIB_PARAMS 24
 
-struct bmp280_calib_param {
+typedef struct bmp280_calib_param {
     // temperature compensation
     uint16_t dig_t1;
     int16_t  dig_t2;
@@ -69,15 +69,22 @@ struct bmp280_calib_param {
     int16_t  dig_p7;
     int16_t  dig_p8;
     int16_t  dig_p9;
-};
+} bmp280_calib_param;
+
+// struct for storing bmp280 data
+typedef struct bmp280_data_t {
+    float  temperature;
+    uint32_t  pressure_pa;
+} bmp280_data_t;
 
 // Function Prototypes
-void bmp280_init();
+void bmp280_reg_config(void);
 void bmp280_read_raw(int32_t* temp, int32_t* pressure);
-void bmp280_reset();
+void bmp280_reset(void);
 int32_t bmp280_convert(int32_t temp, struct bmp280_calib_param* params);
 int32_t bmp280_convert_temp(int32_t temp, struct bmp280_calib_param* params);
 int32_t bmp280_convert_pressure(int32_t pressure, int32_t temp, struct bmp280_calib_param* params);
 void bmp280_get_calib_params(struct bmp280_calib_param* params);
+void bmp280_init(void);
 
 #endif

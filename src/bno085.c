@@ -283,7 +283,7 @@ void bno085_poll(void) {
 }
 
 // enable different reports, at 100 hz
-void bno085_enable_reports(void) {
+bool bno085_enable_reports(void) {
     bool rotation = enable_report(SH2_ROTATION_VECTOR, 10000);
     bool accel = enable_report(SH2_ACCELEROMETER, 10000);
     bool mag = enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000);

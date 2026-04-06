@@ -99,35 +99,9 @@ int main(void) {
     sleep_ms(10);
     
     // bmp280 initialisation
-    // test i2c communication - try to read from bmp280
-    uint8_t test_buf[1];
-    int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
-    printf("bmp280 I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
-    
-    if (ret < 0) {
-        printf("Trying alternate address 0x77...\n");
-        ret = i2c_read_blocking(i2c_default, 0x77, test_buf, 1, false);
-        printf("I2C read test (addr 0x77): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
-    }
-    
-    // Reset the BMP280
-    bmp280_reset();
-    sleep_ms(1000);  //wait after reset
-    printf("bmp280 reset\n");
-    
-    // Initialize the BMP280
     bmp280_init();
-    sleep_ms(1000);  //wait after init
     printf("bmp280 initialised\n");
-    
-    // Read calibration parameters
-    struct bmp280_calib_param calib_params;
-    bmp280_get_calib_params(&calib_params);
-    // print struct for debug/info
-    printf("Calibration parameters loaded\n");
-    printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", calib_params.dig_t1, calib_params.dig_t2, calib_params.dig_t3);
-    printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", calib_params.dig_p1, calib_params.dig_p2, calib_params.dig_p3);
-    
+
     // gps initialisation
     while(!gps_init(GTU7_UART, GTU7_TX, GTU7_RX, GTU7_BAUD)){
         sleep_ms(1000);
@@ -144,21 +118,17 @@ int main(void) {
     uint32_t last_data_print = 0; // for printing
     static float last_qx, last_qy, last_qz;
     static int stale_count = 0;
-    int32_t raw_temp, raw_pressure;
     char obc_telem [142]; // internal buffer can be bigger than obc buffer but i'll just set it exactly
     gps_data_t gps; // local gps struct for core0
 
     // main loop
     while (1) {
         blink_polling();
-        // polling bmp280
-        bmp280_read_raw(&raw_temp, &raw_pressure);
         
-        // conversions needed for bmp280
-        int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
-        uint32_t pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
-        float temperature = temp_c / 100.0f;
-
+        // bmp280 polling
+        bmp280_data_t bmp280_main; // local main struct for bmp280 data
+        bmp280_get(&bmp280_main);
+        
         bno085_poll();
 
         // timer for print and watchdog
@@ -172,7 +142,6 @@ int main(void) {
 
         // polling bno085
         if(bno085_get_report(&state)){
-            last_sensor_read = now;
             if (state.status == 0){
                 if (++stale_count > 100) {
                     printf("data unreliable for 1s, running sh2_devReset\n");
@@ -187,22 +156,11 @@ int main(void) {
             
             // print data, rate limited atm
             if (now - last_data_print > 100) {
-                // print checks, so that data sent to obc is always the same length
-                // gps.lat = 0.0;
-                // gps.lon = 0.1;
-                // printf("lat: %f, lon: %f\n", gps.lat, gps.lon);
-                // if (gps.lon > 180.0 || gps.lon < -180.0 ) {
-                //     gps.lon = 0.0; // should pad itself
-                // }
-                // if (gps.lat > 90.0 || gps.lat < -90.0) {
-                //     gps.lat = 0.0; // should pad itself
-                // }
-
                 // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
                 uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
                     gps.hour, gps.min, gps.sec, 
                     gps.lat, gps.lon, gps.alt, gps.fix_quality,
-                    temperature, pressure_pa, state.status[0],
+                    bmp280_main.temperature, bmp280_main.pressure_pa, state.status[0],
                     state.accel[0], state.accel[1], state.accel[2],
                     state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
                     state.mag[0],   state.mag[1],   state.mag[2]);
@@ -220,24 +178,7 @@ int main(void) {
 
                 adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
             }
-        }
-
-        // reset stuffs
-        if (now - last_sensor_read > 50000) {
-            printf("watchdog timeout, resetting hardware\n");
-            if (bno085_hw_reset()) {
-                // reset timer so we don't meet if statement condition immediately and get stuck
-                last_sensor_read = to_ms_since_boot(get_absolute_time());
-            } else {
-                printf("bno085_hw_reset failed, starting next loop\n");
-                last_sensor_read = to_ms_since_boot(get_absolute_time());
-                continue;
-            }
-        } else if (reset_occurred) {
-            bno085_reset(); // resets reports and the flag
-            last_sensor_read = now;
         } 
-        
         sleep_ms(5);
     }
     
