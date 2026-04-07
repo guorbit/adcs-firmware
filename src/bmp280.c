@@ -157,7 +157,7 @@ void bmp280_init(void){
     // printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", params->dig_p1, params->dig_p2, params->dig_p3);
 }
 
-void bmp280_poll(void){
+void bmp280_update(void){
     // polling bmp280;
     int32_t raw_temp, raw_pressure;
     bmp280_read_raw(&raw_temp, &raw_pressure);

@@ -17,11 +17,11 @@
 
 extern volatile bool reset_occurred;
 
-typedef struct {
+typedef struct bno085_state_t{
     float accel[3];
     float quat[4];
     float mag[3];
-    int8_t status[1];
+    int8_t status[1]; // length 1
 } bno085_state_t;
 
 // sh2 hal
@@ -41,6 +41,8 @@ bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us);
 bool bno085_get_report(bno085_state_t *out);
 void bno085_poll(void);
 bool bno085_enable_reports(void);
+void bno085_update(void);
+void bno085_get(bno085_state_t *data);
 
 // reset stuff
 void bno085_reset(void);

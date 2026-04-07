@@ -22,10 +22,8 @@ volatile bool reset_occurred = false;
 static bool bno085_has_new = false;
 static sh2_SensorValue_t sensorValue; // initialise struct of type sh2_SensorValue_t
 static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is pointer to the struct provided by the sh2 driver
+static bno085_state_t bno085_data; // internal storage struct for bno085 data
 static bno085_state_t internal_state;
-// probably need to provide a definition for the sensor_value struct, for now look at the sh2.h file
-
-
 
 ///// sh2 hal, this is the protocol running on the bno085
 int sh2chal_open(sh2_Hal_t *self) {
@@ -165,7 +163,6 @@ uint32_t hal_getTimeUs(sh2_Hal_t *self)
     return (uint32_t)to_us_since_boot(get_absolute_time());
 }
 
-
 ///// bno085 driver
 bool bno085_init(void) {
     // check device present, does bno ack ?
@@ -243,7 +240,7 @@ bool bno085_get_report(bno085_state_t *out) {
     }
 
     // uint8_t status; /**< @brief bits 7-5: reserved, 4-2: exponent delay, 1-0: Accuracy */, so use a mask for just accuracy
-    internal_state.status[1] =  (sensor_value->status & 0x03);
+    internal_state.status[0] =  (sensor_value->status & 0x03);
     bno085_has_new = false; // reset flag
     switch (sensor_value->sensorId) {
         case SH2_ACCELEROMETER:
@@ -347,4 +344,32 @@ bool bno085_hw_reset(void) {
         return false;
     }
     sleep_ms(2000);
+}
+
+static int stale_count = 0;
+void bno085_update(void){
+    // poll bno085
+    static bno085_state_t bno085_tmp;
+    bno085_get_report(&bno085_tmp);
+
+    // stale check
+    if (bno085_tmp.status == 0){
+        if (++stale_count > 100) {
+            printf("data unreliable for 1s, running sh2_devReset\n");
+            sh2_devReset();
+            // re-init sensor ?
+            stale_count = 0; // reset flag
+        }
+    } else {
+        // reset flag, otherwise it's pretty easy to get stale_count == 0 and trigger a reset
+        bno085_data = bno085_tmp;
+        stale_count = 0; 
+    }
+
+}
+
+void bno085_get(bno085_state_t *data){
+    if (data != NULL){
+        *data = bno085_data;
+    }
 }

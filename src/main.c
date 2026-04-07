@@ -127,9 +127,14 @@ int main(void) {
         
         // bmp280 polling
         bmp280_data_t bmp280_main; // local main struct for bmp280 data
+        bmp280_update();
         bmp280_get(&bmp280_main);
         
-        bno085_poll();
+        // bno085 polling
+        bno085_state_t bno085_main;
+        bno085_update();
+        bno085_get(&bno085_main);
+        bno085_poll(); // idk why this is here
 
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
@@ -141,45 +146,31 @@ int main(void) {
         critical_section_exit(&gps_crit);
 
         // polling bno085
-        if(bno085_get_report(&state)){
-            if (state.status == 0){
-                if (++stale_count > 100) {
-                    printf("data unreliable for 1s, running sh2_devReset\n");
-                    sh2_devReset();
-                    // re-init sensor ?
-                    stale_count = 0; // reset flag
-                }
-            } else {
-                // reset flag, otherwise it's pretty easy to get stale_count == 0 and trigger a reset
-                stale_count = 0; 
-            }
-            
-            // print data, rate limited atm
-            if (now - last_data_print > 100) {
-                // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
-                uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
-                    gps.hour, gps.min, gps.sec, 
-                    gps.lat, gps.lon, gps.alt, gps.fix_quality,
-                    bmp280_main.temperature, bmp280_main.pressure_pa, state.status[0],
-                    state.accel[0], state.accel[1], state.accel[2],
-                    state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
-                    state.mag[0],   state.mag[1],   state.mag[2]);
 
-                last_data_print = now;
+        // print data, rate limited atm
+        if (now - last_data_print > 100) {
+            // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
+            uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
+                gps.hour, gps.min, gps.sec, 
+                gps.lat, gps.lon, gps.alt, gps.fix_quality,
+                bmp280_main.temperature, bmp280_main.pressure_pa, state.status[0],
+                state.accel[0], state.accel[1], state.accel[2],
+                state.quat[0],  state.quat[1],  state.quat[2], state.quat[3],
+                state.mag[0],   state.mag[1],   state.mag[2]);
 
-                #if ADCS_DEBUG
+            last_data_print = now;
 
-                printf(shared_nmea_raw);
+            #if ADCS_DEBUG
 
-                printf("length of buffer: %d\n", obc_msg_len); // currently 141
-                printf(obc_telem);
+            printf(shared_nmea_raw);
 
-                #endif
+            printf("length of buffer: %d\n", obc_msg_len); // currently 141
+            printf(obc_telem);
 
-                adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
-            }
-        } 
-        sleep_ms(5);
-    }
-    
+            #endif
+
+            adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
+        }
+    sleep_ms(5);
+    }   
 }
