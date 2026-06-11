@@ -131,6 +131,7 @@ int main(void) {
         
         // bno085 polling
         bno085_state_t bno085_main; // local main struct for bno085 data
+        printf("int_pin: %d\n", gpio_get(BNO085_INT_PIN));
         bno085_poll(); // idk why this is here
         bno085_update();
         bno085_get(&bno085_main);

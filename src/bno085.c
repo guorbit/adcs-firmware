@@ -206,7 +206,9 @@ bool bno085_init(void) {
         sleep_ms(5);
     }    
 
-    printf("bno085_init complete\n");
+    
+
+    printf("bno085_init: done\n");
     return true;
 }
 
@@ -227,7 +229,7 @@ bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us) {
     int status = sh2_setSensorConfig(sensorId, &cfg);
     
     if (status != SH2_OK) {
-        printf("enable_report failed. error code: %d \n", status);
+        printf("enable_report: failed, error code: %d \n", status);
         sleep_ms(1000);
     }
     // 1 = true, 0 = false
@@ -346,26 +348,15 @@ bool bno085_hw_reset(void) {
     sleep_ms(2000);
 }
 
-static int stale_count = 0;
 void bno085_update(void){
     // poll bno085
     static bno085_state_t bno085_tmp;
     bno085_get_report(&bno085_tmp);
 
     // stale check
-    if (bno085_tmp.status[0] == 0){
-        if (++stale_count > 100) {
-            printf("data unreliable for 1s, running sh2_devReset\n");
-            sh2_devReset();
-            // re-init sensor ?
-            stale_count = 0; // reset flag
-        }
-    } else {
-        // reset flag, otherwise it's pretty easy to get stale_count == 0 and trigger a reset
+    if (bno085_tmp.status[0] > 0){
         bno085_data = bno085_tmp;
-        stale_count = 0; 
     }
-
 }
 
 void bno085_get(bno085_state_t *data){
