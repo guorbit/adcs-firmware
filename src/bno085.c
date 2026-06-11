@@ -13,7 +13,7 @@
 #include "sh2_err.h"
 #include "sh2_hal.h"
 #include "bno085.h"
-#include "adcs_i2c.h"
+#include "sensor_i2c.h"
 
 // to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
@@ -46,10 +46,10 @@ int sh2chal_open(sh2_Hal_t *self) {
     bool success = false;
 
     // ensure I2C pins are using I2C function and pulled up
-    gpio_set_function(ADCS_SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(ADCS_SCL_PIN, GPIO_FUNC_I2C);
-    gpio_pull_up(ADCS_SDA_PIN);
-    gpio_pull_up(ADCS_SCL_PIN);
+    gpio_set_function(SENSOR_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(SENSOR_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(SENSOR_SDA);
+    gpio_pull_up(SENSOR_SCL);
 
     // if we have a hardware reset pin, pulse it to ensure sensor is in a known state
     if (BNO085_RST_PIN >= 0) {
@@ -67,7 +67,7 @@ int sh2chal_open(sh2_Hal_t *self) {
     for (uint8_t attempts = 0; attempts < 5; attempts++) {
         printf("attempt %d: sending reset...\n", attempts+1);
         sleep_ms(10);
-        int result = i2c_write_timeout_us(ADCS_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US);
+        int result = i2c_write_timeout_us(SENSOR_I2C, BNO085_ADDR, softreset_pkt, 5, false, I2C_TIMEOUT_US);
         
         // if result is 5 bytes (softrest_pkt)
         if (result == 5) {
@@ -83,7 +83,7 @@ int sh2chal_open(sh2_Hal_t *self) {
 
     if (!success) {
         printf("sh2chal_open failed, resetting i2c bus\n");
-        i2c_bus_reset(ADCS_I2C, ADCS_SDA_PIN, ADCS_SCL_PIN);
+        i2c_bus_reset(SENSOR_I2C, SENSOR_SDA, SENSOR_SCL);
         return -1;
     }
 
@@ -97,7 +97,7 @@ void sh2_hal_close(sh2_Hal_t *self) {
 
 int sh2_hal_write(sh2_Hal_t *self, uint8_t *buf, unsigned len){
     int write;
-    write = i2c_write_timeout_us(ADCS_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
+    write = i2c_write_timeout_us(SENSOR_I2C, BNO085_ADDR, buf, len, false, I2C_TIMEOUT_US);
     
     if (write != (int)len) {
         printf("i2c write failed. requested length: %d, error code: %d \n", len, write);
@@ -117,7 +117,7 @@ int sh2_hal_read(sh2_Hal_t *self, uint8_t *i2c_buffer, unsigned len, uint32_t *t
         return 0;
     }
 
-    return_value = i2c_read_timeout_us(ADCS_I2C, BNO085_ADDR, i2c_buffer, len, false, I2C_TIMEOUT_US);
+    return_value = i2c_read_timeout_us(SENSOR_I2C, BNO085_ADDR, i2c_buffer, len, false, I2C_TIMEOUT_US);
 
     if (return_value <= 0) {
         return 0;
@@ -167,7 +167,7 @@ uint32_t hal_getTimeUs(sh2_Hal_t *self)
 bool bno085_init(void) {
     // check device present, does bno ack ?
     uint8_t dummy;
-    int res = i2c_read_timeout_us(ADCS_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
+    int res = i2c_read_timeout_us(SENSOR_I2C, BNO085_ADDR, &dummy, 1, false, I2C_TIMEOUT_US);
     if (res <= 0) {
        printf("failed: bno085 didn't ack. error code : %d\n", res);
        sleep_ms(100);
@@ -353,7 +353,7 @@ void bno085_update(void){
     bno085_get_report(&bno085_tmp);
 
     // stale check
-    if (bno085_tmp.status == 0){
+    if (bno085_tmp.status[0] == 0){
         if (++stale_count > 100) {
             printf("data unreliable for 1s, running sh2_devReset\n");
             sh2_devReset();
