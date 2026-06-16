@@ -15,7 +15,8 @@
 #include "bno085.h"
 #include "sensor_i2c.h"
 
-// to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
+#define BNO085_TELEM_LEN 79 // not tested either
+// driver for the imu, to get acceleration x,y,z; yaw, pitch, roll; magnetic heading
 
 static sh2_Hal_t HAL;
 volatile bool reset_occurred = false;
@@ -359,8 +360,31 @@ void bno085_update(void){
     }
 }
 
-void bno085_get(bno085_state_t *data){
-    if (data != NULL){
-        *data = bno085_data;
+// void bno085_get(bno085_state_t *data){
+//     if (data != NULL){
+//         *data = bno085_data;
+//     }
+// }
+
+void bno085_print(char *buf, size_t len){
+    // temporary buffer used to check data
+    char tmp[128];
+
+    // test length of string before sending to main.c
+    int len_test = snprintf(tmp, sizeof(tmp), 
+    "i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
+    bno085_data.status[0],
+    bno085_data.accel[0], bno085_data.accel[1], bno085_data.accel[2],
+    bno085_data.quat[0],  bno085_data.quat[1],  bno085_data.quat[2], bno085_data.quat[3],
+    bno085_data.mag[0],   bno085_data.mag[1],   bno085_data.mag[2]);
+
+    if (len_test == BNO085_TELEM_LEN > BNO085_TELEM_LEN){
+        strncpy(buf, tmp, BNO085_TELEM_LEN);
+        return BNO085_TELEM_LEN;
+    }else{
+        // error string should match BNO085_TELEM_LEN, pls check
+        const char* error_msg = "iX|a+000.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
+        strncpy(buf, error_msg, BNO085_TELEM_LEN);
+        return BNO085_TELEM_LEN; // should change to be what the actual size of the string is
     }
 }

@@ -8,6 +8,7 @@
 #include "sensor_i2c.h"
 // based on https://github.com/raspberrypi/pico-examples/tree/master/i2c/ADCS_I2C
 
+#define BMP280_TELEM_LEN 17 // not tested
 static struct bmp280_calib_param calib_params;
 // current bmp280 data stored here
 static struct bmp280_data_t bmp280_data;
@@ -169,9 +170,26 @@ void bmp280_update(void){
     bmp280_data.temperature = temp_c / 100.0f;
 }
 
-// pass the local bmp280 struct held by main into this function
-void bmp280_get(bmp280_data_t *data){
-    if (data != NULL){
-        *data = bmp280_data;
+// // pass the local bmp280 struct held by main into this function
+// void bmp280_get(bmp280_data_t *data){
+//     if (data != NULL){
+//         *data = bmp280_data;
+//     }
+// }
+
+void bmp280_print(char *buf, size_t len){
+    // temporary buffer used to check data
+    char tmp[32];
+
+    // test length of string before sending to main.c
+    int len_test = snprintf(tmp, sizeof(tmp), "c%07.2f|b%06lu|", bmp280_data.temperature, bmp280_data.pressure_pa);
+    if (len_test == BMP280_TELEM_LEN > BMP280_TELEM_LEN){
+        strncpy(buf, tmp, BMP280_TELEM_LEN);
+        return BMP280_TELEM_LEN;
+    }else{
+        // error string should match BMP280_TELEM_LEN, pls check
+        const char* error_msg = "c_ERROR_|b_ERR_|";
+        strncpy(buf, error_msg, BMP280_TELEM_LEN);
+        return BMP280_TELEM_LEN; // should change to be what the actual size of the string is
     }
 }

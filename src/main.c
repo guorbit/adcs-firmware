@@ -69,16 +69,6 @@ int main(void) {
     critical_section_init(&gps_crit);
     blink_init();
 
-    // // reset the imu by driving the reset pin low for 20ms, then releasing
-    // gpio_init(BNO085_RST_PIN);
-    // gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
-    // // drive low to reset
-    // gpio_put(BNO085_RST_PIN, 0);
-    // sleep_ms(20);
-    // // release
-    // gpio_put(BNO085_RST_PIN, 1);
-    // sleep_ms(2000);
-
     // init i2c for bmp280 and bno085
     sensor_i2c_init();
     
@@ -116,7 +106,6 @@ int main(void) {
     uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
     uint32_t last_data_print = 0; // for printing
     static float last_qx, last_qy, last_qz;
-    static int stale_count = 0;
     char obc_telem [136]; // internal buffer can be bigger than obc buffer but i'll just set it exactly
     gps_data_t gps; // local gps struct for core0
 
@@ -127,7 +116,7 @@ int main(void) {
         // bmp280 polling
         bmp280_data_t bmp280_main; // local main struct for bmp280 data
         bmp280_update();
-        bmp280_get(&bmp280_main);
+        // bmp280_get(&bmp280_main);
         
         // bno085 polling
         bno085_state_t bno085_main; // local main struct for bno085 data

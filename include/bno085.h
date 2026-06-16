@@ -42,7 +42,7 @@ bool bno085_get_report(bno085_state_t *out);
 void bno085_poll(void);
 bool bno085_enable_reports(void);
 void bno085_update(void);
-void bno085_get(bno085_state_t *data);
+// void bno085_get(bno085_state_t *data);
 
 // reset stuff
 void bno085_reset(void);
