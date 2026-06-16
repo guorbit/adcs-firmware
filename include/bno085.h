@@ -43,6 +43,7 @@ void bno085_poll(void);
 bool bno085_enable_reports(void);
 void bno085_update(void);
 // void bno085_get(bno085_state_t *data);
+uint32_t bno085_print(char *buf, size_t len);
 
 // reset stuff
 void bno085_reset(void);

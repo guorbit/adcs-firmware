@@ -366,7 +366,7 @@ void bno085_update(void){
 //     }
 // }
 
-void bno085_print(char *buf, size_t len){
+uint32_t bno085_print(char *buf, size_t len){
     // temporary buffer used to check data
     char tmp[128];
 

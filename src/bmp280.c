@@ -177,7 +177,7 @@ void bmp280_update(void){
 //     }
 // }
 
-void bmp280_print(char *buf, size_t len){
+uint32_t bmp280_print(char *buf, size_t len){
     // temporary buffer used to check data
     char tmp[32];
 

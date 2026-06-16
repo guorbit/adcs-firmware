@@ -88,7 +88,7 @@ void bmp280_get_calib_params(struct bmp280_calib_param* params);
 void bmp280_init(void);
 void bmp280_update(void);
 // void bmp280_get(bmp280_data_t *data);
-void bmp280_print(char *buf, size_t len);
-void bmp280_print(char *buf, size_t len);
+uint32_t bmp280_print(char *buf, size_t len);
+
 
 #endif

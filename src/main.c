@@ -43,6 +43,7 @@ void main1(void) {
         // Critical section to update shared_gps
         critical_section_enter_blocking(&gps_crit);
         gps_update_shared(gps, nmea_raw);
+        critical_section_exit(&gps_crit);
 
         sleep_ms(5);
     }
@@ -115,16 +116,11 @@ int main(void) {
         printf("int_pin: %d\n", gpio_get(BNO085_INT_PIN));
         bno085_poll(); // idk why this is here
         bno085_update();
-        bno085_get(&bno085_main);
+        // bno085_get(&bno085_main);
 
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
         float qw, qx, qy, qz;
-
-        // Fetch GPS data from shared variable
-        critical_section_enter_blocking(&gps_crit);
-        gps = shared_gps;
-        critical_section_exit(&gps_crit);
 
         // print data, rate limited atm
         if (now - last_data_print > 100) {
@@ -141,7 +137,7 @@ int main(void) {
 
             #if ADCS_DEBUG
 
-            printf(shared_nmea_raw);
+            // printf(shared_nmea_raw);
 
             printf("length of buffer: %d\n", obc_msg_len); // currently 136 but keeps changing, need to fix
             printf(obc_telem);

@@ -101,28 +101,29 @@ gps_data_t gps_data(void){
     return gps_state;
 }
 
-gps_update_shared(gps_data_t gps, char *nmea_raw){
-        #if ADCS_DEBUG
-        strncpy(shared_nmea_raw, nmea_raw, sizeof(shared_nmea_raw) - 1);
-        shared_nmea_raw[sizeof(shared_nmea_raw) - 1] = '\0';
-        #endif
-        shared_gps = gps;
+void gps_update_shared(gps_data_t gps, char *nmea_raw){
+    #if ADCS_DEBUG
+    strncpy(shared_nmea_raw, nmea_raw, sizeof(shared_nmea_raw) - 1);
+    shared_nmea_raw[sizeof(shared_nmea_raw) - 1] = '\0';
+    #endif
+    shared_gps = gps;
 }
 
-size_t gtu7_print(char* buf, size_t max_len){
+uint32_t gtu7_print(char* buf, size_t max_len){
     char tmp[96];
-    gps_data_t local_gps;
+    gps_data_t gps;
 
+    // Fetch GPS data from shared variable
     critical_section_enter_blocking(&gps_crit);
-    local_gps = shared_gps;
+    gps = shared_gps;
     critical_section_exit(&gps_crit);
     
     // check length of string
     int len_test = snprintf(tmp, sizeof(tmp),
         "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%1d|",
-        local_gps.hour, local_gps.min, local_gps.sec, 
-        local_gps.lat, local_gps.lon, local_gps.alt, 
-        local_gps.fix_quality);
+        gps.hour, gps.min, gps.sec, 
+        gps.lat, gps.lon, gps.alt, 
+        gps.fix_quality);
     
     if (len_test == GTU7_TELEM_LEN){
         strncpy(buf, tmp, GTU7_TELEM_LEN);
