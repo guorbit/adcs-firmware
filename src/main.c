@@ -21,10 +21,7 @@
 
 #define ADCS_DEBUG true
 
-
-// Shared resources
-char shared_nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
-gps_data_t shared_gps;
+// shared resources
 critical_section_t gps_crit;
 
 // Core1
@@ -45,12 +42,7 @@ void main1(void) {
 
         // Critical section to update shared_gps
         critical_section_enter_blocking(&gps_crit);
-        #if ADCS_DEBUG
-        strncpy(shared_nmea_raw, nmea_raw, sizeof(shared_nmea_raw) - 1);
-        shared_nmea_raw[sizeof(shared_nmea_raw) - 1] = '\0';
-        #endif
-        shared_gps = gps;
-        critical_section_exit(&gps_crit);
+        gps_update_shared(gps, nmea_raw);
 
         sleep_ms(5);
     }

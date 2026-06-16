@@ -378,13 +378,13 @@ void bno085_print(char *buf, size_t len){
     bno085_data.quat[0],  bno085_data.quat[1],  bno085_data.quat[2], bno085_data.quat[3],
     bno085_data.mag[0],   bno085_data.mag[1],   bno085_data.mag[2]);
 
-    if (len_test == BNO085_TELEM_LEN > BNO085_TELEM_LEN){
+    if (len_test == BNO085_TELEM_LEN){
         strncpy(buf, tmp, BNO085_TELEM_LEN);
         return BNO085_TELEM_LEN;
     }else{
         // error string should match BNO085_TELEM_LEN, pls check
         const char* error_msg = "iX|a+000.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
         strncpy(buf, error_msg, BNO085_TELEM_LEN);
-        return BNO085_TELEM_LEN; // should change to be what the actual size of the string is
+        return BNO085_TELEM_LEN;
     }
 }

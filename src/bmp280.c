@@ -183,7 +183,7 @@ void bmp280_print(char *buf, size_t len){
 
     // test length of string before sending to main.c
     int len_test = snprintf(tmp, sizeof(tmp), "c%07.2f|b%06lu|", bmp280_data.temperature, bmp280_data.pressure_pa);
-    if (len_test == BMP280_TELEM_LEN > BMP280_TELEM_LEN){
+    if (len_test == BMP280_TELEM_LEN){
         strncpy(buf, tmp, BMP280_TELEM_LEN);
         return BMP280_TELEM_LEN;
     }else{
