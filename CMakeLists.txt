@@ -31,7 +31,7 @@ set(PICO_BOARD pico CACHE STRING "Board type")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
-project(ADCS_git C CXX ASM)
+project(adcs-firmware C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
@@ -43,7 +43,7 @@ include(minnmea.cmake)
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(ADCS_git
+add_executable(adcs-firmware
     src/main.c
     src/gtu7.c
     src/bmp280.c
@@ -59,21 +59,21 @@ add_executable(ADCS_git
     lib/shtp.c
 )
 
-pico_set_program_name(ADCS_git "ADCS_git")
-pico_set_program_version(ADCS_git "0.1")
+pico_set_program_name(adcs-firmware "adcs-firmware")
+pico_set_program_version(adcs-firmware "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(ADCS_git 0)
-pico_enable_stdio_usb(ADCS_git 1)
+pico_enable_stdio_uart(adcs-firmware 0)
+pico_enable_stdio_usb(adcs-firmware 1)
 
 # Specify uart0 pins 16 and 17 as default
-TARGET_COMPILE_DEFINITIONS(ADCS_git PRIVATE 
+TARGET_COMPILE_DEFINITIONS(adcs-firmware PRIVATE 
     PICO_DEFAULT_UART_TX_PIN=16
     PICO_DEFAULT_UART_RX_PIN=17)
 
 
 # Add any user requested libraries
-target_link_libraries(ADCS_git 
+target_link_libraries(adcs-firmware 
         pico_stdlib
         hardware_i2c
         pico_i2c_slave
@@ -84,9 +84,9 @@ target_link_libraries(ADCS_git
         )
 
 # Add the standard include files to the build
-target_include_directories(ADCS_git PRIVATE
+target_include_directories(adcs-firmware PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
         ${CMAKE_CURRENT_LIST_DIR}/lib
 )
 
-pico_add_extra_outputs(ADCS_git)
+pico_add_extra_outputs(adcs-firmware)

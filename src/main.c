@@ -71,6 +71,8 @@ int main(void) {
 
     // bno085 initialisation
     printf("Starting BNO085\n");
+    // reset bno085
+    bno085_hw_reset();
     while(!bno085_init()) {
         printf("retry bno085_init\n");
         i2c_bus_reset(SENSOR_I2C, SENSOR_SDA, SENSOR_SCL);
@@ -78,7 +80,6 @@ int main(void) {
         sleep_ms(1000);
     }
     bno085_enable_reports();
-    printf("BNO085 ready v6\n");
     sleep_ms(100);
     
     // bmp280 initialisation
@@ -109,12 +110,11 @@ int main(void) {
         // bmp280 polling
         bmp280_data_t bmp280_main; // local main struct for bmp280 data
         bmp280_update();
-        // bmp280_get(&bmp280_main);
+        // bmp280_get(&bmp280_main); // old print logic
         
         // bno085 polling
         bno085_state_t bno085_main; // local main struct for bno085 data
-        printf("int_pin: %d\n", gpio_get(BNO085_INT_PIN));
-        bno085_poll(); // idk why this is here
+        bno085_poll(); 
         bno085_update();
         // bno085_get(&bno085_main);
 
@@ -134,6 +134,7 @@ int main(void) {
             
             // newline
             offset += snprintf(obc_telem + offset, sizeof(obc_telem) - offset, "\n");
+            printf("int_pin: %d\n", gpio_get(BNO085_INT_PIN));
             
             uint16_t obc_msg_len = offset;
             last_data_print = now;
@@ -143,7 +144,7 @@ int main(void) {
             // printf(shared_nmea_raw);
 
             printf("length of buffer: %d\n", obc_msg_len); // currently 136 but keeps changing, need to fix
-            printf(obc_telem);
+            printf("%s", obc_telem);
 
             #endif
 

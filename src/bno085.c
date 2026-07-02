@@ -295,10 +295,13 @@ bool bno085_enable_reports(void) {
     if (!rotation || !accel || !mag) {
         return false;
     }
+
+    printf("bno085_enable_reports: done\n");
     return true; 
 }
 
 // reset stuff, trying to keep it in one place
+// currently unused due to pending rpi watchdog implementation
 void bno085_reset(void) {
     // handles the reset_occured flag, re-inits the reports
     printf("sensor reset detected, re-enabling reports (bno085_reset)");
@@ -329,6 +332,7 @@ void bno085_reset(void) {
 bool bno085_hw_reset(void) {
     gpio_init(BNO085_RST_PIN);
     gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
+    // gpio_pull_up(BNO085_RST_PIN);
     // drive low to reset
     gpio_put(BNO085_RST_PIN, 0);
     sleep_ms(20);
@@ -337,16 +341,15 @@ bool bno085_hw_reset(void) {
     sleep_ms(200);
 
     // stop sh2, will re-init in main later
-    sh2_close();
+    // sh2_close();
 
-    // need to re-init
-    if (bno085_init()){
-        return true;
-    } else {
-        printf("bno085_hw_reset failed to re-initialise\n");
-        return false;
-    }
-    sleep_ms(2000);
+    // --- if this is commented out, you must call bno085_init() in main ---
+    // if (bno085_init()){
+    //     return true;
+    // } else {
+    //     printf("bno085_hw_reset failed to re-initialise\n");
+    //     return false;
+    // }
 }
 
 void bno085_update(void){
@@ -360,6 +363,7 @@ void bno085_update(void){
     }
 }
 
+// --- old print logic ---
 // void bno085_get(bno085_state_t *data){
 //     if (data != NULL){
 //         *data = bno085_data;
@@ -378,12 +382,14 @@ uint32_t bno085_print(char *buf, size_t len){
     bno085_data.quat[0],  bno085_data.quat[1],  bno085_data.quat[2], bno085_data.quat[3],
     bno085_data.mag[0],   bno085_data.mag[1],   bno085_data.mag[2]);
 
-    if (len_test == BNO085_TELEM_LEN){
+    if (len_test <= BNO085_TELEM_LEN){
         strncpy(buf, tmp, BNO085_TELEM_LEN);
-        return BNO085_TELEM_LEN;
+        return len_test;
     }else{
         // error string should match BNO085_TELEM_LEN, pls check
-        const char* error_msg = "iX|a+000.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
+        printf("bno085_print: len test [%d], BNO085_TELEM_LEN [%d], strlen [%d]\n", len_test, BNO085_TELEM_LEN, len_test);
+        //                      "iX|a+.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
+        const char* error_msg = "iX|a+.ERROR..ERROR..00|q+ERROR.+ERROR.+ERROR.+ERROR.|m+ERROR.+ERROR.+ERROR.|\n";
         strncpy(buf, error_msg, BNO085_TELEM_LEN);
         return BNO085_TELEM_LEN;
     }
