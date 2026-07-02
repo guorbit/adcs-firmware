@@ -124,15 +124,18 @@ int main(void) {
 
         // print data, rate limited atm
         if (now - last_data_print > 100) {
+            uint32_t offset = 0;
+            
             // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
-            uint16_t obc_msg_len = snprintf(obc_telem, sizeof(obc_telem), "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%d|c%07.2f|b%lu|i%d|a%+07.2f%+07.2f%+07.2f|q%+07.2f%+07.2f%+07.2f%+07.2f|m%+07.2f%+07.2f%+07.2f\n",
-                gps.hour, gps.min, gps.sec, 
-                gps.lat, gps.lon, gps.alt, gps.fix_quality,
-                bmp280_main.temperature, bmp280_main.pressure_pa, bno085_main.status[0],
-                bno085_main.accel[0], bno085_main.accel[1], bno085_main.accel[2],
-                bno085_main.quat[0],  bno085_main.quat[1],  bno085_main.quat[2], bno085_main.quat[3],
-                bno085_main.mag[0],   bno085_main.mag[1],   bno085_main.mag[2]);
-
+            // gtu7 data
+            offset += gtu7_print(obc_telem + offset, sizeof(obc_telem) - offset);
+            offset += bmp280_print(obc_telem + offset, sizeof(obc_telem) - offset);
+            offset += bno085_print(obc_telem + offset, sizeof(obc_telem) - offset);
+            
+            // newline
+            offset += snprintf(obc_telem + offset, sizeof(obc_telem) - offset, "\n");
+            
+            uint16_t obc_msg_len = offset;
             last_data_print = now;
 
             #if ADCS_DEBUG
