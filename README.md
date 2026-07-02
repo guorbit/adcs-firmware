@@ -22,7 +22,7 @@ mandatory stuff that interfaces with sh2, I based it off the repo linked at the 
 but the best way to understand it is to read the source code (https://github.com/ceva-dsp/sh2) and
 write functions based on what sh2 is asking for (I do not do this unless I have to). There is also
 documentation that ceva (the guys who made the bno085) wrote, I have read this but near the start of
-development when I was clueless, so it wasn't very helpful (https://www.ceva-ip.com/wpcontent/uploads/SH-2-SHTP-Reference-Manual.pdf). The nice thing is that the sh2 driver I wrote is
+development when I was clueless, so it wasn't very helpful (https://www.ceva-ip.com/wp-content/uploads/SH-2-SHTP-Reference-Manual.pdf). The nice thing is that the sh2 driver I wrote is
 usually not the problem, but instead something else thing I did, so hopefully this won't cause you
 too much pain.
 You can build and flash to the board using the raspberry pi pico extension in vscode.
