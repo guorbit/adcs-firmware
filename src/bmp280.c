@@ -171,12 +171,6 @@ void bmp280_update(void){
     bmp280_data.temperature = temp_c / 100.0f;
 }
 
-// // pass the local bmp280 struct held by main into this function
-// void bmp280_get(bmp280_data_t *data){
-//     if (data != NULL){
-//         *data = bmp280_data;
-//     }
-// }
 
 uint32_t bmp280_print(char *buf, size_t len){
     // temporary buffer used to check data

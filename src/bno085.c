@@ -175,8 +175,6 @@ bool bno085_init(void) {
        return false; // return to main.c
     }
 
-    // printf("success: bno085 acknowledged\n");
-
     // fill HAL struct
     HAL.open      = sh2chal_open;
     HAL.close     = sh2_hal_close;
@@ -198,7 +196,6 @@ bool bno085_init(void) {
 
     // fetch inital boot packet to clear sensor
     for (int i = 0; i < 200; i++) {
-        // printf("int pin state: %d \n", gpio_get(BNO085_INT_PIN));
         // check if pulled low, i.e. bno085 has ack/data
         if (gpio_get(BNO085_INT_PIN) == 0){
             bno085_poll(); // poll sensor for advert packet
@@ -300,39 +297,10 @@ bool bno085_enable_reports(void) {
     return true; 
 }
 
-// reset stuff, trying to keep it in one place
-// currently unused due to pending rpi watchdog implementation
-void bno085_reset(void) {
-    // handles the reset_occured flag, re-inits the reports
-    printf("sensor reset detected, re-enabling reports (bno085_reset)");
-
-    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
-        while(1){
-            printf("could not enable rotation vector\n");
-            sleep_ms(1000);
-        }
-    }
-    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
-        while(1){
-            printf("could not enable accelerometer\n");
-            sleep_ms(1000);
-        }
-    }
-    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
-        while(1){
-            printf("could not enable magnetometer\n");
-            sleep_ms(1000);
-        }
-    }
-
-    // reset the flag
-    reset_occurred = false;
-}
 
 bool bno085_hw_reset(void) {
     gpio_init(BNO085_RST_PIN);
     gpio_set_dir(BNO085_RST_PIN, GPIO_OUT);
-    // gpio_pull_up(BNO085_RST_PIN);
     // drive low to reset
     gpio_put(BNO085_RST_PIN, 0);
     sleep_ms(20);
@@ -340,16 +308,6 @@ bool bno085_hw_reset(void) {
     gpio_put(BNO085_RST_PIN, 1);
     sleep_ms(200);
 
-    // stop sh2, will re-init in main later
-    // sh2_close();
-
-    // --- if this is commented out, you must call bno085_init() in main ---
-    // if (bno085_init()){
-    //     return true;
-    // } else {
-    //     printf("bno085_hw_reset failed to re-initialise\n");
-    //     return false;
-    // }
 }
 
 void bno085_update(void){
@@ -363,12 +321,6 @@ void bno085_update(void){
     }
 }
 
-// --- old print logic ---
-// void bno085_get(bno085_state_t *data){
-//     if (data != NULL){
-//         *data = bno085_data;
-//     }
-// }
 
 uint32_t bno085_print(char *buf, size_t len){
     // temporary buffer used to check data

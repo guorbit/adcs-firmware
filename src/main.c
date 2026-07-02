@@ -110,13 +110,11 @@ int main(void) {
         // bmp280 polling
         bmp280_data_t bmp280_main; // local main struct for bmp280 data
         bmp280_update();
-        // bmp280_get(&bmp280_main); // old print logic
         
         // bno085 polling
         bno085_state_t bno085_main; // local main struct for bno085 data
         bno085_poll(); 
         bno085_update();
-        // bno085_get(&bno085_main);
 
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
@@ -127,7 +125,6 @@ int main(void) {
             uint32_t offset = 0;
             
             // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
-            // gtu7 data
             offset += gtu7_print(obc_telem + offset, sizeof(obc_telem) - offset);
             offset += bmp280_print(obc_telem + offset, sizeof(obc_telem) - offset);
             offset += bno085_print(obc_telem + offset, sizeof(obc_telem) - offset);
