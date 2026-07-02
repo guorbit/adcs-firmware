@@ -1,13 +1,21 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
-#include "bmp280.h"
 #include "pico/binary_info.h"
 
-// based on https://github.com/raspberrypi/pico-examples/tree/master/i2c/bmp280_i2c
+#include "bmp280.h"
+#include "sensor_i2c.h"
+// based on https://github.com/raspberrypi/pico-examples/tree/master/i2c/ADCS_I2C
 
-void bmp280_init() {
+#define BMP280_TELEM_LEN 17 // not tested
+static struct bmp280_calib_param calib_params;
+// current bmp280 data stored here
+static struct bmp280_data_t bmp280_data;
+
+// this the old bmp280_init function
+void bmp280_reg_config(void) {
     // 2 byte buffer, [reg addr, reg val]
     uint8_t buf[2];
 
@@ -18,14 +26,14 @@ void bmp280_init() {
     // send register number followed by its corresponding value
     buf[0] = BMP280_REG_CONFIG;
     buf[1] = reg_config_val;
-    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, buf, 2, false);
+    i2c_write_blocking(SENSOR_I2C, BMP280_ADDR, buf, 2, false);
 
     // osrs_t x1, osrs_p x4, normal mode operation
     const uint8_t reg_ctrl_meas_val = (0x01 << 5) | (0x03 << 2) | (0x03);
     // reusing the buffer
     buf[0] = BMP280_REG_CTRL_MEAS;
     buf[1] = reg_ctrl_meas_val;
-    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, buf, 2, false);
+    i2c_write_blocking(SENSOR_I2C, BMP280_ADDR, buf, 2, false);
 }
 
 // read raw data from sensor
@@ -36,18 +44,18 @@ void bmp280_read_raw(int32_t* temp, int32_t* pressure) {
 
     uint8_t buf[6];
     uint8_t reg = BMP280_REG_PRESSURE_MSB;
-    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
-    i2c_read_blocking(BMP280_I2C, BMP280_ADDR, buf, 6, false);  // false - finished with bus
+    i2c_write_blocking(SENSOR_I2C, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
+    i2c_read_blocking(SENSOR_I2C, BMP280_ADDR, buf, 6, false);  // false - finished with bus
 
     // store the 20 bit read in a 32 bit signed integer for conversion
     *pressure = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4);
     *temp = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4);
 }
 
-void bmp280_reset() {
+void bmp280_reset(void) {
     // reset the device with the power-on-reset procedure
     uint8_t buf[2] = { BMP280_REG_RESET, 0xB6 };
-    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, buf, 2, false);
+    i2c_write_blocking(SENSOR_I2C, BMP280_ADDR, buf, 2, false);
 }
 
 // intermediate function that calculates the fine resolution temperature
@@ -104,9 +112,9 @@ void bmp280_get_calib_params(struct bmp280_calib_param* params) {
 
     uint8_t buf[BMP280_NUM_CALIB_PARAMS] = { 0 };
     uint8_t reg = BMP280_REG_DIG_T1_LSB;
-    i2c_write_blocking(BMP280_I2C, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
+    i2c_write_blocking(SENSOR_I2C, BMP280_ADDR, &reg, 1, true);  // true to keep master control of bus
     // read in one go as register addresses auto-increment
-    i2c_read_blocking(BMP280_I2C, BMP280_ADDR, buf, BMP280_NUM_CALIB_PARAMS, false);  // false, we're done reading
+    i2c_read_blocking(SENSOR_I2C, BMP280_ADDR, buf, BMP280_NUM_CALIB_PARAMS, false);  // false, we're done reading
 
     // store these in a struct for later use
     params->dig_t1 = (uint16_t)(buf[1] << 8) | buf[0];
@@ -124,3 +132,66 @@ void bmp280_get_calib_params(struct bmp280_calib_param* params) {
     params->dig_p9 = (int16_t)(buf[23] << 8) | buf[22];
 }
 
+void bmp280_init(void){
+    uint8_t test_buf[1];
+    int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
+    printf("bmp280 I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    if (ret < 0) {
+        printf("Trying alternate address 0x77...\n");
+        ret = i2c_read_blocking(i2c_default, 0x77, test_buf, 1, false);
+        printf("I2C read test (addr 0x77): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
+    }
+
+    // Reset the BMP280
+    bmp280_reset();
+    sleep_ms(5);  //wait after reset
+    // printf("bmp280 reset\n");
+    
+    // Initialize the BMP280
+    bmp280_reg_config();
+    sleep_ms(5);  //wait after init
+    
+    // Read calibration parameters
+    bmp280_get_calib_params(&calib_params);
+    // print struct for debug/info
+    printf("Calibration parameters loaded\n");
+    // printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", params->dig_t1, params->dig_t2, params->dig_t3);
+    // printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", params->dig_p1, params->dig_p2, params->dig_p3);
+}
+
+void bmp280_update(void){
+    // polling bmp280;
+    int32_t raw_temp, raw_pressure;
+    bmp280_read_raw(&raw_temp, &raw_pressure);
+
+    // conversions needed for bmp280
+    int32_t temp_c = bmp280_convert_temp(raw_temp, &calib_params);
+    // update struct
+    bmp280_data.pressure_pa = bmp280_convert_pressure(raw_pressure, raw_temp, &calib_params);
+    bmp280_data.temperature = temp_c / 100.0f;
+}
+
+// // pass the local bmp280 struct held by main into this function
+// void bmp280_get(bmp280_data_t *data){
+//     if (data != NULL){
+//         *data = bmp280_data;
+//     }
+// }
+
+uint32_t bmp280_print(char *buf, size_t len){
+    // temporary buffer used to check data
+    char tmp[32];
+
+    // test length of string before sending to main.c
+    int len_test = snprintf(tmp, sizeof(tmp), "c%07.2f|b%06lu|", bmp280_data.temperature, bmp280_data.pressure_pa);
+    if (len_test <= BMP280_TELEM_LEN){
+        strncpy(buf, tmp, BMP280_TELEM_LEN);
+        return len_test;
+    }else{
+        printf("bmp280_print: len test [%d], BMP280_TELEM_LEN [%d], strlen [%d]\n", len_test, BMP280_TELEM_LEN, len_test);
+        // error string should match BMP280_TELEM_LEN, pls check
+        const char* error_msg = "c_ERROR_|b_ERR_|";
+        strncpy(buf, error_msg, BMP280_TELEM_LEN);
+        return BMP280_TELEM_LEN; // should change to be what the actual size of the string is
+    }
+}

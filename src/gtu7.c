@@ -9,8 +9,19 @@
 // my goat lol, based on https://github.com/kosma/minmea/blob/master/example.c
 #include <stdint.h>
 #include "pico/stdlib.h"
+#include "pico/sync.h"
 
 #include "gtu7.h"
+
+#define ADCS_DEBUG true
+#define GTU7_TELEM_LEN 44
+
+// Shared resources
+char shared_nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
+gps_data_t shared_gps;
+extern critical_section_t gps_crit;
+extern gps_data_t shared_gps;
+
 
 // initialise storage struct
 static gps_data_t gps_state = {0};
@@ -88,5 +99,41 @@ void gps_get_sentence(char *line) {
 
 gps_data_t gps_data(void){
     return gps_state;
+}
+
+void gps_update_shared(gps_data_t gps, char *nmea_raw){
+    #if ADCS_DEBUG
+    strncpy(shared_nmea_raw, nmea_raw, sizeof(shared_nmea_raw) - 1);
+    shared_nmea_raw[sizeof(shared_nmea_raw) - 1] = '\0';
+    #endif
+    shared_gps = gps;
+}
+
+uint32_t gtu7_print(char* buf, size_t max_len){
+    char tmp[96];
+    gps_data_t gps;
+
+    // Fetch GPS data from shared variable
+    critical_section_enter_blocking(&gps_crit);
+    gps = shared_gps;
+    critical_section_exit(&gps_crit);
+    
+    // check length of string
+    int len_test = snprintf(tmp, sizeof(tmp),
+        "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%1d|",
+        gps.hour, gps.min, gps.sec, 
+        gps.lat, gps.lon, gps.alt, 
+        gps.fix_quality);
+    
+    if (len_test <= GTU7_TELEM_LEN){
+        strncpy(buf, tmp, GTU7_TELEM_LEN);
+        return len_test;
+    }else{
+        printf("gtu7_print: len test [%d], GTU7_TELEM_LEN [%d], strlen [%d]\n", len_test, GTU7_TELEM_LEN, len_test);
+        //                      "t000000|N+00.00000|E+000.00000|h+000.00m|f0|";
+        const char* error_msg = "tERROR.|N+ERROR...|E+ERROR....|h+ERROR.m|f0|";
+        strncpy(buf, error_msg, GTU7_TELEM_LEN);
+        return GTU7_TELEM_LEN;
+    }
 }
 

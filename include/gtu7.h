@@ -31,6 +31,7 @@ bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud);
 gps_data_t gps_data(void);
 bool read_gtu7_uart(char *line, int max_length);
 void gps_get_sentence(char *line); // Call this when data arrives
-
+void gps_update_shared(gps_data_t gps, char *nmea_raw);
+uint32_t gtu7_print(char* buf, size_t max_len);
 
 #endif

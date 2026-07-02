@@ -6,10 +6,10 @@
 
 // device has default bus address of 0x76
 #define BMP280_ADDR      0x76
-#define BMP280_I2C       i2c0
+// #define BMP280_I2C       i2c0
 
-#define BMP280_SDA_PIN   8 // rpi pico gpio pins, same as bno085 bc on the same bus
-#define BMP280_SCL_PIN   9
+// #define BMP280_SDA_PIN   8 // rpi pico gpio pins, same as bno085 bc on the same bus
+// #define BMP280_SCL_PIN   9
 
 // hardware registers
 #define BMP280_REG_CONFIG _u(0xF5)
@@ -53,7 +53,7 @@
 // number of calibration registers to be read
 #define BMP280_NUM_CALIB_PARAMS 24
 
-struct bmp280_calib_param {
+typedef struct bmp280_calib_param {
     // temperature compensation
     uint16_t dig_t1;
     int16_t  dig_t2;
@@ -69,15 +69,26 @@ struct bmp280_calib_param {
     int16_t  dig_p7;
     int16_t  dig_p8;
     int16_t  dig_p9;
-};
+} bmp280_calib_param;
 
-// Function Prototypes
-void bmp280_init();
+// struct for storing bmp280 data
+typedef struct bmp280_data_t {
+    float  temperature;
+    uint32_t  pressure_pa;
+} bmp280_data_t;
+
+// function declarations
+void bmp280_reg_config(void);
 void bmp280_read_raw(int32_t* temp, int32_t* pressure);
-void bmp280_reset();
+void bmp280_reset(void);
 int32_t bmp280_convert(int32_t temp, struct bmp280_calib_param* params);
 int32_t bmp280_convert_temp(int32_t temp, struct bmp280_calib_param* params);
 int32_t bmp280_convert_pressure(int32_t pressure, int32_t temp, struct bmp280_calib_param* params);
 void bmp280_get_calib_params(struct bmp280_calib_param* params);
+void bmp280_init(void);
+void bmp280_update(void);
+// void bmp280_get(bmp280_data_t *data);
+uint32_t bmp280_print(char *buf, size_t len);
+
 
 #endif
