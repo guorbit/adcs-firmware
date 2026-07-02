@@ -1,4 +1,4 @@
-#### firmware for adcs cloudview 2 board
+## firmware for adcs cloudview 2 board
 developed using the pico sdk, using the raspberry pi pico vs code extension.
 
 The point of the code is to take code from the three sensors and send it as a string to the OBC. You
