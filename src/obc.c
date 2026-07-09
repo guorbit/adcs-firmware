@@ -58,8 +58,6 @@ void adcs_telemetry(const uint8_t *data, size_t len){
 // initialisation
 void adcs_slave_init(void)
 {
-    stdio_init_all();
-
     // I2C Initialisation. Using it at 50Khz for better reliability.
     i2c_init(ADCS_PORT, 100*1000);
     // sets the function of the GPIO pins (from general to i2c)
