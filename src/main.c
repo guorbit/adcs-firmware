@@ -24,6 +24,12 @@
 // shared resources
 critical_section_t gps_crit;
 
+// init bools
+bool bno085_init_check = 0;
+bool bmp280_init_check = 0;
+bool gtu7_init_check = 0;
+
+
 // Core1
 void main1(void) {
     // init stuff that will be used in while loop
@@ -71,27 +77,37 @@ int main(void) {
 
     // bno085 initialisation
     printf("Starting BNO085\n");
-    // reset bno085
-    bno085_hw_reset();
-    while(!bno085_init()) {
-        printf("retry bno085_init\n");
-        i2c_bus_reset(SENSOR_I2C, SENSOR_SDA, SENSOR_SCL);
-        sh2_devReset();
-        sleep_ms(1000);
+    if(!bno085_init()) {
+        printf("bno085_init failed\n");
+        // hardware reset
+        bno085_hw_reset();
+        bno085_init_check = 0;
+    } else {
+        bno085_init_check = 1;
+        printf("bno085_init done\n");
     }
-    bno085_enable_reports();
+
+    uint8_t report_check = bno085_enable_reports();
+    printf("BNO085 ready v6\n");
     sleep_ms(100);
     
     // bmp280 initialisation
-    bmp280_init();
-    printf("bmp280 initialised\n");
+    if(!bmp280_init()) {
+        printf("bmp280_init failed\n");
+        bmp280_init_check = 0;
+    } else {
+        bmp280_init_check = 1;
+        printf("bmp280_init done\n");
+    }
 
     // gps initialisation
-    while(!gps_init(GTU7_UART, GTU7_TX, GTU7_RX, GTU7_BAUD)){
-        sleep_ms(1000);
-        printf("gtu7 init failed, retrying\n");
+    if(!gtu7_init(GTU7_UART, GTU7_TX, GTU7_RX, GTU7_BAUD)){
+        printf("gtu7_init failed\n");
+        gtu7_init_check = 0;
+    } else {
+        gtu7_init_check = 1;
+        printf("gtu7_init done\n");
     }
-    printf("gtu7 initialised\n");
 
     // Launch Core 1
     multicore_launch_core1(main1);
@@ -147,6 +163,60 @@ int main(void) {
 
             adcs_telemetry((const uint8_t *)obc_telem, strlen(obc_telem));
         }
+
+        // checks
+        if (bno085_init_check == 0){
+            if(!bno085_init()) {
+                printf("bno085_init failed\n");
+                // hardware reset
+                bno085_hw_reset();
+                bno085_init_check = 0;
+            } else {
+                bno085_init_check = 1;
+                printf("bno085_init failed\n");
+    }
+        }
+        if (bmp280_init_check == 0){
+            if(!bmp280_init()) {
+                printf("bmp280_init failed\n");
+                bmp280_init_check = 0;
+            } else {
+                bmp280_init_check = 1;
+                printf("bmp280_init done\n");
+            }
+        }
+        if (gtu7_init_check == 0){
+            if(!gtu7_init(GTU7_UART, GTU7_TX, GTU7_RX, GTU7_BAUD)){
+                printf("gtu7_init failed\n");
+                gtu7_init_check = 0;
+            } else {
+                gtu7_init_check = 1;
+                printf("gtu7 initialised\n");
+            }
+        }
+
+        bool rotation_report_check_extracted  = (report_check >> 0) & 1;
+        bool accel_report_check_extracted = (report_check >> 1) & 1;
+        bool mag_report_check_extracted  = (report_check >> 2) & 1;
+
+        if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
+            printf("enable_report failed (rotation vector)\n");
+            accel_report_check_extracted = 0;        
+        } else{
+            accel_report_check_extracted = 1; 
+        }
+        if (!enable_report(SH2_ACCELEROMETER, 10000)) {
+            printf("enable_report failed (accelerometer)\n");
+            rotation_report_check_extracted = 0;
+        } else{
+            rotation_report_check_extracted = 1;
+        }
+        if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
+            printf("enable_report failed (magnetometer)\n");
+            mag_report_check_extracted = 0;
+        } else {
+            mag_report_check_extracted = 1;
+    }
     sleep_ms(5);
     }   
 }

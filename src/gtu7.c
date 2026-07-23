@@ -26,7 +26,7 @@ extern gps_data_t shared_gps;
 // initialise storage struct
 static gps_data_t gps_state = {0};
 
-bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
+bool gtu7_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
     sleep_ms(2000);
 
     uint16_t return_baud = uart_init(uart, baud);
@@ -127,11 +127,11 @@ uint32_t gtu7_print(char* buf, size_t max_len){
     
     if (len_test <= GTU7_TELEM_LEN){
         strncpy(buf, tmp, GTU7_TELEM_LEN);
-        return len_test;
-    }else{
+        return GTU7_TELEM_LEN;
+    } else{
+      //const char* error_msg = "t000000|N+00.00000|E+000.00000|h+000.00m|f0|";
+        const char* error_msg = "t0ERROR|N+00.ERROR|E+000.ERROR|h+0ERRORm|f0|";
         printf("gtu7_print: len test [%d], GTU7_TELEM_LEN [%d], strlen [%d]\n", len_test, GTU7_TELEM_LEN, len_test);
-        //                      "t000000|N+00.00000|E+000.00000|h+000.00m|f0|";
-        const char* error_msg = "tERROR.|N+ERROR...|E+ERROR....|h+ERROR.m|f0|";
         strncpy(buf, error_msg, GTU7_TELEM_LEN);
         return GTU7_TELEM_LEN;
     }

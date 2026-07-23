@@ -26,6 +26,11 @@ static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is point
 static bno085_state_t bno085_data; // internal storage struct for bno085 data
 static bno085_state_t internal_state;
 
+// enable report bools
+bool accel_report_check = 0;
+bool mag_report_check = 0;
+bool rotation_report_check = 0;
+
 ///// sh2 hal, this is the protocol running on the bno085
 int sh2chal_open(sh2_Hal_t *self) {
     // Serial.println("I2C HAL open");
@@ -280,23 +285,60 @@ void bno085_poll(void) {
 }
 
 // enable different reports, at 100 hz
-bool bno085_enable_reports(void) {
-    bool rotation = enable_report(SH2_ROTATION_VECTOR, 100000);
-    bool accel = enable_report(SH2_ACCELEROMETER, 100000);
-    bool mag = enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 500000);
+uint8_t bno085_enable_reports(void) {
+    // enable reports
+    enable_report(SH2_ROTATION_VECTOR, 10000);
+    enable_report(SH2_ACCELEROMETER, 10000);
+    enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000);
 
-    if (!rotation) printf("Failed: Rotation Vector\n");
-    if (!accel) printf("Failed: Accelerometer\n");
-    if (!mag) printf("Failed: Magnetometer\n");
-
-    if (!rotation || !accel || !mag) {
-        return false;
+    // checks
+    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
+        printf("enable_report failed (rotation vector)\n");
+        accel_report_check = 0;        
+    } else{
+        accel_report_check = 1; 
+    }
+    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
+        printf("enable_report failed (accelerometer)\n");
+        rotation_report_check = 0;
+    } else{
+        rotation_report_check = 1;
+    }
+    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
+        printf("enable_report failed (magnetometer)\n");
+        mag_report_check = 0;
+    } else {
+        mag_report_check = 1;
     }
 
-    printf("bno085_enable_reports: done\n");
-    return true; 
+    // bit masking
+    uint8_t report_check = (rotation_report_check << 0) | (accel_report_check << 1) | (mag_report_check << 2);
+
+    return report_check;
 }
 
+// reset stuff, trying to keep it in one place
+void bno085_reset(void) {
+    // handles the reset_occured flag, re-inits the reports
+    printf("sensor reset detected, re-enabling reports (bno085_reset)");
+
+    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
+        rotation_report_check = 0;
+        printf("enable_report failed (rotation vector)\n");
+    }
+    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
+        accel_report_check = 0;
+        printf("enable_report failed (accelerometer)\n");
+    }
+    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
+        mag_report_check = 0;
+        printf("enable_report failed (magnetometer)\n");
+    }
+    // will be checked in main
+
+    // reset the flag
+    reset_occurred = false;
+}
 
 bool bno085_hw_reset(void) {
     gpio_init(BNO085_RST_PIN);
@@ -306,8 +348,18 @@ bool bno085_hw_reset(void) {
     sleep_ms(20);
     // release
     gpio_put(BNO085_RST_PIN, 1);
-    sleep_ms(200);
+    sleep_ms(1500);
 
+    // stop sh2, will re-init in bno085_init() later
+    sh2_close();
+
+    // need to re-init
+    if (bno085_init()){
+        return true;
+    } else {
+        printf("bno085_hw_reset failed to re-initialise\n");
+        return false;
+    }
 }
 
 void bno085_update(void){
@@ -339,9 +391,9 @@ uint32_t bno085_print(char *buf, size_t len){
         return len_test;
     }else{
         // error string should match BNO085_TELEM_LEN, pls check
+        const char* error_msg = "iX|a+ERR.00+ERR.00+ERR.00|q+ERR.00+ERR.00+ERR.00+ERR.00|m+ERR.00+ERR.00+ERR.00|";
         printf("bno085_print: len test [%d], BNO085_TELEM_LEN [%d], strlen [%d]\n", len_test, BNO085_TELEM_LEN, len_test);
         //                      "iX|a+.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
-        const char* error_msg = "iX|a+.ERROR..ERROR..00|q+ERROR.+ERROR.+ERROR.+ERROR.|m+ERROR.+ERROR.+ERROR.|\n";
         strncpy(buf, error_msg, BNO085_TELEM_LEN);
         return BNO085_TELEM_LEN;
     }

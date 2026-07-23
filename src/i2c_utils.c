@@ -47,18 +47,18 @@ int i2c_bus_scan(i2c_inst_t *i2c, int sda_pin, int scl_pin) {
 }
 
 void i2c_bus_reset(i2c_inst_t *i2c, int sda_pin, int scl_pin) {
-    printf("resetting i2c bus\n");
+    printf("i2c_bus_reset\n");
     // Disable I2C hardware briefly
     i2c_deinit(i2c);
     
-    // Manual toggle of SCL to clear stuck SDA
-    gpio_init(scl_pin);
-    gpio_init(sda_pin);
-    gpio_set_dir(scl_pin, GPIO_OUT);
-    for (int i = 0; i < 10; i++) {
-        gpio_put(scl_pin, 0); sleep_us(5);
-        gpio_put(scl_pin, 1); sleep_us(5);
-    }
+    // // Manual toggle of SCL to clear stuck SDA
+    // gpio_init(scl_pin);
+    // gpio_init(sda_pin);
+    // gpio_set_dir(scl_pin, GPIO_OUT);
+    // for (int i = 0; i < 10; i++) {
+    //     gpio_put(scl_pin, 0); sleep_us(5);
+    //     gpio_put(scl_pin, 1); sleep_us(5);
+    // }
     
     // Re-initialize I2C
     gpio_set_function(sda_pin, GPIO_FUNC_I2C);
