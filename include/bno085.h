@@ -37,10 +37,10 @@ uint32_t hal_getTimeUs(sh2_Hal_t *self);
 
 // bno085 driver
 bool bno085_init(void);
-uint8_t enable_report(sh2_SensorId_t sensorId, uint32_t interval_us);
+bool enable_report(sh2_SensorId_t sensorId, uint32_t interval_us);
 bool bno085_get_report(bno085_state_t *out);
 void bno085_poll(void);
-bool bno085_enable_reports(void);
+uint8_t bno085_enable_reports(void);
 void bno085_update(void);
 // void bno085_get(bno085_state_t *data);
 uint32_t bno085_print(char *buf, size_t len);

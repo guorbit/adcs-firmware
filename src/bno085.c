@@ -399,7 +399,7 @@ uint32_t bno085_print(char *buf, size_t len){
         return BNO085_TELEM_LEN;
     }else{
         // error string should match BNO085_TELEM_LEN, pls check
-        const char* error_msg = "iX|a+000.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
+        const char* error_msg = "iX|a+ERR.00+ERR.00+ERR.00|q+ERR.00+ERR.00+ERR.00+ERR.00|m+ERR.00+ERR.00+ERR.00|";
         strncpy(buf, error_msg, BNO085_TELEM_LEN);
         return BNO085_TELEM_LEN;
     }

@@ -128,8 +128,9 @@ uint32_t gtu7_print(char* buf, size_t max_len){
     if (len_test == GTU7_TELEM_LEN){
         strncpy(buf, tmp, GTU7_TELEM_LEN);
         return GTU7_TELEM_LEN;
-    }else{
-        const char* error_msg = "t000000|N+00.00000|E+000.00000|h+000.00m|f0|";
+    } else{
+      //const char* error_msg = "t000000|N+00.00000|E+000.00000|h+000.00m|f0|";
+        const char* error_msg = "t0ERROR|N+00.ERROR|E+000.ERROR|h+0ERRORm|f0|";
         strncpy(buf, error_msg, GTU7_TELEM_LEN);
         return GTU7_TELEM_LEN;
     }
