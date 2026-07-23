@@ -26,7 +26,7 @@ extern gps_data_t shared_gps;
 // initialise storage struct
 static gps_data_t gps_state = {0};
 
-bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
+bool gtu7_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud) {
     sleep_ms(2000);
 
     uint16_t return_baud = uart_init(uart, baud);

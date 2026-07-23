@@ -26,6 +26,11 @@ static sh2_SensorValue_t * sensor_value = &sensorValue; // sensor_value is point
 static bno085_state_t bno085_data; // internal storage struct for bno085 data
 static bno085_state_t internal_state;
 
+// enable report bools
+bool accel_report_check = 0;
+bool mag_report_check = 0;
+bool rotation_report_check = 0;
+
 ///// sh2 hal, this is the protocol running on the bno085
 int sh2chal_open(sh2_Hal_t *self) {
     // Serial.println("I2C HAL open");
@@ -283,19 +288,36 @@ void bno085_poll(void) {
 }
 
 // enable different reports, at 100 hz
-bool bno085_enable_reports(void) {
-    bool rotation = enable_report(SH2_ROTATION_VECTOR, 10000);
-    bool accel = enable_report(SH2_ACCELEROMETER, 10000);
-    bool mag = enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000);
+uint8_t bno085_enable_reports(void) {
+    // enable reports
+    enable_report(SH2_ROTATION_VECTOR, 10000);
+    enable_report(SH2_ACCELEROMETER, 10000);
+    enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000);
 
-    if (!rotation) printf("Failed: Rotation Vector\n");
-    if (!accel) printf("Failed: Accelerometer\n");
-    if (!mag) printf("Failed: Magnetometer\n");
-
-    if (!rotation || !accel || !mag) {
-        return false;
+    // checks
+    if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
+        printf("enable_report failed (rotation vector)\n");
+        accel_report_check = 0;        
+    } else{
+        accel_report_check = 1; 
     }
-    return true; 
+    if (!enable_report(SH2_ACCELEROMETER, 10000)) {
+        printf("enable_report failed (accelerometer)\n");
+        rotation_report_check = 0;
+    } else{
+        rotation_report_check = 1;
+    }
+    if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
+        printf("enable_report failed (magnetometer)\n");
+        mag_report_check = 0;
+    } else {
+        mag_report_check = 1;
+    }
+
+    // bit masking
+    uint8_t report_check = (rotation_report_check << 0) | (accel_report_check << 1) | (mag_report_check << 2);
+
+    return report_check;
 }
 
 // reset stuff, trying to keep it in one place
@@ -304,23 +326,18 @@ void bno085_reset(void) {
     printf("sensor reset detected, re-enabling reports (bno085_reset)");
 
     if (!enable_report(SH2_ROTATION_VECTOR, 10000)) {
-        while(1){
-            printf("could not enable rotation vector\n");
-            sleep_ms(1000);
-        }
+        rotation_report_check = 0;
+        printf("enable_report failed (rotation vector)\n");
     }
     if (!enable_report(SH2_ACCELEROMETER, 10000)) {
-        while(1){
-            printf("could not enable accelerometer\n");
-            sleep_ms(1000);
-        }
+        accel_report_check = 0;
+        printf("enable_report failed (accelerometer)\n");
     }
     if (!enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000)) {
-        while(1){
-            printf("could not enable magnetometer\n");
-            sleep_ms(1000);
-        }
+        mag_report_check = 0;
+        printf("enable_report failed (magnetometer)\n");
     }
+    // will be checked in main
 
     // reset the flag
     reset_occurred = false;
@@ -334,9 +351,9 @@ bool bno085_hw_reset(void) {
     sleep_ms(20);
     // release
     gpio_put(BNO085_RST_PIN, 1);
-    sleep_ms(200);
+    sleep_ms(1500);
 
-    // stop sh2, will re-init in main later
+    // stop sh2, will re-init in bno085_init() later
     sh2_close();
 
     // need to re-init
@@ -346,7 +363,6 @@ bool bno085_hw_reset(void) {
         printf("bno085_hw_reset failed to re-initialise\n");
         return false;
     }
-    sleep_ms(2000);
 }
 
 void bno085_update(void){

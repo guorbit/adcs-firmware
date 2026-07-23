@@ -131,7 +131,7 @@ void bmp280_get_calib_params(struct bmp280_calib_param* params) {
     params->dig_p9 = (int16_t)(buf[23] << 8) | buf[22];
 }
 
-void bmp280_init(void){
+bool bmp280_init(void){
     uint8_t test_buf[1];
     int ret = i2c_read_blocking(i2c_default, 0x76, test_buf, 1, false);
     printf("bmp280 I2C read test (addr 0x76): %s\n", ret >= 0 ? "SUCCESS" : "FAILED");
@@ -144,7 +144,6 @@ void bmp280_init(void){
     // Reset the BMP280
     bmp280_reset();
     sleep_ms(5);  //wait after reset
-    // printf("bmp280 reset\n");
     
     // Initialize the BMP280
     bmp280_reg_config();
@@ -156,6 +155,7 @@ void bmp280_init(void){
     printf("Calibration parameters loaded\n");
     // printf("dig_t1=%u, dig_t2=%d, dig_t3=%d\n", params->dig_t1, params->dig_t2, params->dig_t3);
     // printf("dig_p1=%u, dig_p2=%d, dig_p3=%d\n", params->dig_p1, params->dig_p2, params->dig_p3);
+    return(1);
 }
 
 void bmp280_update(void){

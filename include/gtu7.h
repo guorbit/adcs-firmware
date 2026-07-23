@@ -27,7 +27,7 @@ typedef struct {
 } gps_data_t;
 
 // function declarations
-bool gps_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud);
+bool gtu7_init(uart_inst_t *uart, uint8_t tx, uint8_t rx, uint16_t baud);
 gps_data_t gps_data(void);
 bool read_gtu7_uart(char *line, int max_length);
 void gps_get_sentence(char *line); // Call this when data arrives
