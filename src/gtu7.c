@@ -125,12 +125,13 @@ uint32_t gtu7_print(char* buf, size_t max_len){
         gps.lat, gps.lon, gps.alt, 
         gps.fix_quality);
     
-    if (len_test == GTU7_TELEM_LEN){
+    if (len_test <= GTU7_TELEM_LEN){
         strncpy(buf, tmp, GTU7_TELEM_LEN);
         return GTU7_TELEM_LEN;
     } else{
       //const char* error_msg = "t000000|N+00.00000|E+000.00000|h+000.00m|f0|";
         const char* error_msg = "t0ERROR|N+00.ERROR|E+000.ERROR|h+0ERRORm|f0|";
+        printf("gtu7_print: len test [%d], GTU7_TELEM_LEN [%d], strlen [%d]\n", len_test, GTU7_TELEM_LEN, len_test);
         strncpy(buf, error_msg, GTU7_TELEM_LEN);
         return GTU7_TELEM_LEN;
     }

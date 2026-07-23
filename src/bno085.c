@@ -180,8 +180,6 @@ bool bno085_init(void) {
        return false; // return to main.c
     }
 
-    // printf("success: bno085 acknowledged\n");
-
     // fill HAL struct
     HAL.open      = sh2chal_open;
     HAL.close     = sh2_hal_close;
@@ -203,7 +201,6 @@ bool bno085_init(void) {
 
     // fetch inital boot packet to clear sensor
     for (int i = 0; i < 200; i++) {
-        // printf("int pin state: %d \n", gpio_get(BNO085_INT_PIN));
         // check if pulled low, i.e. bno085 has ack/data
         if (gpio_get(BNO085_INT_PIN) == 0){
             bno085_poll(); // poll sensor for advert packet
@@ -376,11 +373,6 @@ void bno085_update(void){
     }
 }
 
-// void bno085_get(bno085_state_t *data){
-//     if (data != NULL){
-//         *data = bno085_data;
-//     }
-// }
 
 uint32_t bno085_print(char *buf, size_t len){
     // temporary buffer used to check data
@@ -394,12 +386,14 @@ uint32_t bno085_print(char *buf, size_t len){
     bno085_data.quat[0],  bno085_data.quat[1],  bno085_data.quat[2], bno085_data.quat[3],
     bno085_data.mag[0],   bno085_data.mag[1],   bno085_data.mag[2]);
 
-    if (len_test == BNO085_TELEM_LEN){
+    if (len_test <= BNO085_TELEM_LEN){
         strncpy(buf, tmp, BNO085_TELEM_LEN);
-        return BNO085_TELEM_LEN;
+        return len_test;
     }else{
         // error string should match BNO085_TELEM_LEN, pls check
         const char* error_msg = "iX|a+ERR.00+ERR.00+ERR.00|q+ERR.00+ERR.00+ERR.00+ERR.00|m+ERR.00+ERR.00+ERR.00|";
+        printf("bno085_print: len test [%d], BNO085_TELEM_LEN [%d], strlen [%d]\n", len_test, BNO085_TELEM_LEN, len_test);
+        //                      "iX|a+.00+000.00+000.00|q+000.00+000.00+000.00+000.00|m+000.00+000.00+000.00|";
         strncpy(buf, error_msg, BNO085_TELEM_LEN);
         return BNO085_TELEM_LEN;
     }

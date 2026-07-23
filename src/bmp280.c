@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "pico/binary_info.h"
@@ -170,12 +171,6 @@ void bmp280_update(void){
     bmp280_data.temperature = temp_c / 100.0f;
 }
 
-// // pass the local bmp280 struct held by main into this function
-// void bmp280_get(bmp280_data_t *data){
-//     if (data != NULL){
-//         *data = bmp280_data;
-//     }
-// }
 
 uint32_t bmp280_print(char *buf, size_t len){
     // temporary buffer used to check data
@@ -183,10 +178,11 @@ uint32_t bmp280_print(char *buf, size_t len){
 
     // test length of string before sending to main.c
     int len_test = snprintf(tmp, sizeof(tmp), "c%07.2f|b%06lu|", bmp280_data.temperature, bmp280_data.pressure_pa);
-    if (len_test == BMP280_TELEM_LEN){
+    if (len_test <= BMP280_TELEM_LEN){
         strncpy(buf, tmp, BMP280_TELEM_LEN);
-        return BMP280_TELEM_LEN;
+        return len_test;
     }else{
+        printf("bmp280_print: len test [%d], BMP280_TELEM_LEN [%d], strlen [%d]\n", len_test, BMP280_TELEM_LEN, len_test);
         // error string should match BMP280_TELEM_LEN, pls check
         const char* error_msg = "c_ERROR_|b_ERR_|";
         strncpy(buf, error_msg, BMP280_TELEM_LEN);

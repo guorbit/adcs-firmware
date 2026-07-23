@@ -126,31 +126,28 @@ int main(void) {
         // bmp280 polling
         bmp280_data_t bmp280_main; // local main struct for bmp280 data
         bmp280_update();
-        // bmp280_get(&bmp280_main);
         
         // bno085 polling
         bno085_state_t bno085_main; // local main struct for bno085 data
-        printf("int_pin: %d\n", gpio_get(BNO085_INT_PIN));
-        bno085_poll(); // idk why this is here
+        bno085_poll(); 
         bno085_update();
-        // bno085_get(&bno085_main);
 
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        float qw, qx, qy, qz;
+        //float qw, qx, qy, qz;
 
         // print data, rate limited atm
         if (now - last_data_print > 100) {
             uint32_t offset = 0;
             
             // UTC: %02d:%02d:%02d |Lat: %+09.5f, Lon: %+010.5f, Alt: %+07.2fm, Fix: %d| temp: %07.2f | pressure: %lu | bno085 status: %d | acc: %+07.2f %+07.2f %+07.2f | quat: %+07.2f %+07.2f %+07.2f %+07.2f | mag: %+07.2f %+07.2f %+07.2f\n
-            // gtu7 data
             offset += gtu7_print(obc_telem + offset, sizeof(obc_telem) - offset);
             offset += bmp280_print(obc_telem + offset, sizeof(obc_telem) - offset);
             offset += bno085_print(obc_telem + offset, sizeof(obc_telem) - offset);
             
             // newline
             offset += snprintf(obc_telem + offset, sizeof(obc_telem) - offset, "\n");
+            printf("int_pin: %d\n", gpio_get(BNO085_INT_PIN));
             
             uint16_t obc_msg_len = offset;
             last_data_print = now;
@@ -160,7 +157,7 @@ int main(void) {
             // printf(shared_nmea_raw);
 
             printf("length of buffer: %d\n", obc_msg_len); // currently 136 but keeps changing, need to fix
-            printf(obc_telem);
+            printf("%s", obc_telem);
 
             #endif
 

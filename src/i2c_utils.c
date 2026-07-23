@@ -61,7 +61,7 @@ void i2c_bus_reset(i2c_inst_t *i2c, int sda_pin, int scl_pin) {
     // }
     
     // Re-initialize I2C
-    i2c_init(i2c, 100 * 1000);
     gpio_set_function(sda_pin, GPIO_FUNC_I2C);
     gpio_set_function(scl_pin, GPIO_FUNC_I2C);
+    i2c_init(i2c, 100 * 1000);
 }
