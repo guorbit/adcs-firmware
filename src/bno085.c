@@ -281,9 +281,9 @@ void bno085_poll(void) {
 
 // enable different reports, at 100 hz
 bool bno085_enable_reports(void) {
-    bool rotation = enable_report(SH2_ROTATION_VECTOR, 10000);
-    bool accel = enable_report(SH2_ACCELEROMETER, 10000);
-    bool mag = enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 50000);
+    bool rotation = enable_report(SH2_ROTATION_VECTOR, 100000);
+    bool accel = enable_report(SH2_ACCELEROMETER, 100000);
+    bool mag = enable_report(SH2_MAGNETIC_FIELD_CALIBRATED, 500000);
 
     if (!rotation) printf("Failed: Rotation Vector\n");
     if (!accel) printf("Failed: Accelerometer\n");

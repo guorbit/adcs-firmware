@@ -118,7 +118,7 @@ int main(void) {
 
         // timer for print and watchdog
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        float qw, qx, qy, qz;
+        //float qw, qx, qy, qz;
 
         // print data, rate limited atm
         if (now - last_data_print > 100) {
