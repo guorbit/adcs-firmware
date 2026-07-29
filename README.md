@@ -31,4 +31,4 @@ making the code more readable and efficient by moving things from main into thei
 is because main should mostly be calling functions from other files, rather than doing the work
 itself. It's like an outline of the entire program.
 
-I've found ometimes the IMU takes awhile to give you data, especially if you don't use the board for awhile
+I've found sometimes the IMU takes awhile to give you data, especially if you don't use the board for awhile
