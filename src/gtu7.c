@@ -120,7 +120,7 @@ uint32_t gtu7_print(char* buf, size_t max_len){
     
     // check length of string
     int len_test = snprintf(tmp, sizeof(tmp),
-        "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+07.2fm|f%1d|",
+        "t%02d%02d%02d|N%+09.5f|E%+010.5f|h%+09.2fm|f%1d|",
         gps.hour, gps.min, gps.sec, 
         gps.lat, gps.lon, gps.alt, 
         gps.fix_quality);
