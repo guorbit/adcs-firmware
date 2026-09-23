@@ -116,7 +116,7 @@ int main(void) {
     uint32_t last_sensor_read = to_ms_since_boot(get_absolute_time()); // for the watchdog
     uint32_t last_data_print = 0; // for printing
     static float last_qx, last_qy, last_qz;
-    char obc_telem [136]; // internal buffer can be bigger than obc buffer but i'll just set it exactly
+    char obc_telem [138]; // internal buffer can be bigger than obc buffer but i'll just set it exactly
     gps_data_t gps; // local gps struct for core0
 
     // main loop
