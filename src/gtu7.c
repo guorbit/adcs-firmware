@@ -14,7 +14,7 @@
 #include "gtu7.h"
 
 #define ADCS_DEBUG true
-#define GTU7_TELEM_LEN 44
+#define GTU7_TELEM_LEN 49
 
 // Shared resources
 char shared_nmea_raw[MINMEA_MAX_SENTENCE_LENGTH];
